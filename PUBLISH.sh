@@ -22,12 +22,17 @@ if ! "$GH" auth status >/dev/null 2>&1; then
 fi
 
 echo "==> Creating $REPO (private)"
+# `repo create --push` pushes whatever branch is checked out, and that branch
+# becomes the default. Start from main so the feature branch has something to
+# open a pull request against.
+git checkout main
 "$GH" repo create "$REPO" \
   --private \
   --description "An ocean on your wrist — fifteen interactive water modes for Apple Watch, rendered with a SpriteKit fragment shader" \
   --source=. --remote=origin --push
 
 echo "==> Pushing feature branch"
+git checkout feat/water-shader-app
 git push -u origin feat/water-shader-app
 
 echo "==> Opening pull request"
