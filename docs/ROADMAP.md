@@ -146,6 +146,53 @@ Only worth doing if Phase 4 shows any traction.
 - **Rain on glass**, the one idea the height-field approach cannot already
   express and which would need a genuinely different simulation.
 
+---
+
+## Future track — Real Water
+
+This track does not weaken **Phase 0**. Physical-watch validation remains the
+blocking platform-risk gate, and no network-backed product work should be used
+to defer it. The phases below are planned, not shipped, and begin only after the
+relevant product foundation is sound.
+
+### RW1 — Hydro foundation
+
+- Establish provider-independent `HydroState`, normalized environmental forcing,
+  provenance, freshness, deterministic fixtures, and a perceptual interpreter.
+- Keep provider DTOs, networking, UI frameworks, and shader changes outside the
+  portable translation contract.
+
+### RW2 — San Francisco Bay vertical slice
+
+- Integrate environmental forcing into `SurfaceDriver` while preserving wrist
+  interaction as transient forcing.
+- Add the first curated place using NOAA CO-OPS, then USGS Water Data where it
+  contributes a distinct measurement. Use NOAA ERDDAP only as needed.
+- Prove the complete observation-to-render path before generalizing discovery.
+
+### RW3 — Curated Places catalog
+
+- Add a deliberately small catalog of well-supported bodies of water.
+- Publish measurement availability and provenance instead of promising uniform
+  coverage that providers cannot supply.
+
+### RW4 — iPhone geographic discovery
+
+- Add geographic browsing and selection on iPhone after the curated catalog has
+  established the data and product model.
+- Keep map and station-discovery concerns out of `OceanCore`.
+
+### RW5 — Historical playback
+
+- Replay retained observations through the same interpreter contract.
+- Keep playback time separate from render and simulation clocks.
+
+### RW6 — Forecast mode
+
+- Add forecast data only when it can be labeled and sourced distinctly from
+  observed, predicted, and derived values.
+- Never silently substitute forecast values for missing observations.
+
 ## Explicitly not planned
 
 - **A watch face.** Third-party apps cannot be watch faces. This comes up every

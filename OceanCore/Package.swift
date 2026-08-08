@@ -20,5 +20,6 @@ let package = Package(
         // Test suite as a plain executable rather than XCTest: it runs from
         // the command line with only the Swift toolchain installed.
         .executableTarget(name: "oceancheck", dependencies: ["OceanCore"]),
+        .executableTarget(name: "hydrocheck", dependencies: ["OceanCore"]),
     ]
 )

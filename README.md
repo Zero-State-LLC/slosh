@@ -34,6 +34,14 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how it works, and
 [docs/DECISIONS.md](docs/DECISIONS.md) for why — including the design that was
 built, rejected and thrown away.
 
+## Future direction: Real Water
+
+Slosh currently contains authored water **Experiences**. The planned Real Water
+system adds **Places**, where selected geographic bodies of water can drive
+Slosh from accessible environmental observations. Live geographic data is not
+implemented yet; see [docs/REAL_WATER.md](docs/REAL_WATER.md) for the boundary
+and provenance rules.
+
 ## Status
 
 | | |
