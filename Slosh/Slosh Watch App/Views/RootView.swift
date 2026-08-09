@@ -19,6 +19,29 @@ struct RootView: View {
         #endif
     }()
 
+    /// Synthetic fixtures win when both flags are supplied. Live mode is an
+    /// integration harness, not a Places picker, and currently recognizes one
+    /// reviewed body of water only.
+    private static let debugRealWaterBody: WaterBody? = {
+        #if DEBUG && targetEnvironment(simulator)
+        guard debugHydroExperience == nil,
+              let id = UserDefaults.standard.string(forKey: "realWater") else {
+            return nil
+        }
+        return WaterBodies.body(id: id)
+        #else
+        return nil
+        #endif
+    }()
+
+    private static let debugRealWaterForceFailure: Bool = {
+        #if DEBUG && targetEnvironment(simulator)
+        UserDefaults.standard.bool(forKey: "realWaterOffline")
+        #else
+        false
+        #endif
+    }()
+
     @AppStorage(SettingsKey.themeID) private var themeID = OceanTheme.calmOcean.id
     @AppStorage(SettingsKey.energy) private var storedEnergy = EnergyRange.default
     @AppStorage(SettingsKey.hapticsEnabled) private var hapticsEnabled = true
@@ -30,6 +53,11 @@ struct RootView: View {
         theme: .calmOcean,
         hydroExperience: RootView.debugHydroExperience
     )
+    #if DEBUG && targetEnvironment(simulator)
+    @State private var realWaterCoordinator = RealWaterAppCoordinator(
+        forceFailure: RootView.debugRealWaterForceFailure
+    )
+    #endif
     @State private var crownEnergy = EnergyRange.default
 
     /// `simctl launch … -startInPicker YES` opens straight to the picker.
@@ -44,7 +72,9 @@ struct RootView: View {
     }()
 
     private var theme: OceanTheme {
-        RootView.debugHydroExperience == nil ? .theme(id: themeID) : .calmOcean
+        RootView.debugHydroExperience == nil && RootView.debugRealWaterBody == nil
+            ? .theme(id: themeID)
+            : .calmOcean
     }
 
     var body: some View {
@@ -86,10 +116,14 @@ struct RootView: View {
             model.apply(energy: storedEnergy)
             model.haptics.isEnabled = hapticsEnabled
             model.startRunning()
+            activateRealWater()
         }
-        .onDisappear { model.stopRunning() }
+        .onDisappear {
+            deactivateRealWater()
+            model.stopRunning()
+        }
         .onChange(of: themeID) { _, newValue in
-            model.apply(theme: .theme(id: newValue))
+            model.apply(theme: theme)
         }
         .onChange(of: crownEnergy) { _, newValue in
             model.apply(energy: newValue)
@@ -102,17 +136,36 @@ struct RootView: View {
             // Nothing runs unless the app is frontmost and the screen is lit.
             if phase == .active, !isLuminanceReduced {
                 model.startRunning()
+                activateRealWater()
             } else {
+                deactivateRealWater()
                 model.stopRunning()
             }
         }
         .onChange(of: isLuminanceReduced) { _, dimmed in
             if dimmed {
+                deactivateRealWater()
                 model.stopRunning()
             } else if scenePhase == .active {
                 model.startRunning()
+                activateRealWater()
             }
         }
+    }
+
+    private func activateRealWater() {
+        #if DEBUG && targetEnvironment(simulator)
+        realWaterCoordinator.activate(
+            waterBody: RootView.debugRealWaterBody,
+            model: model
+        )
+        #endif
+    }
+
+    private func deactivateRealWater() {
+        #if DEBUG && targetEnvironment(simulator)
+        realWaterCoordinator.deactivate()
+        #endif
     }
 
     @ViewBuilder
