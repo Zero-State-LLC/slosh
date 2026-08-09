@@ -58,6 +58,13 @@ capability is not inferred from a failed request and is never replaced with a
 plausible default. Provider implementations resolve only bindings whose opaque
 namespace they own.
 
+`RoutedHydroProvider` is the application composition boundary. It selects only
+routes matching a place's opaque binding namespaces, fetches matching providers
+independently, tolerates partial provider failure, and merges successful states
+in declared route order. The merged summary uses the oldest observation and
+latest retrieval timestamps. `LiveHydroCoordinator` then applies its existing
+per-place throttle and cache policy to that composed provider.
+
 ## Rendering
 
 Everything visible derives from **one analytic height field**, evaluated per

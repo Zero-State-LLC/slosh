@@ -61,6 +61,28 @@ private actor SequencedProvider: HydroStateProvider {
     func fetchedIDs() -> [WaterBody.ID] { fetchedWaterBodyIDs }
 }
 
+private actor FixedProvider: HydroStateProvider {
+    enum Outcome: Sendable {
+        case success(HydroState)
+        case failure
+    }
+
+    let outcome: Outcome
+    private(set) var fetchCount = 0
+
+    init(_ outcome: Outcome) { self.outcome = outcome }
+
+    func fetch(_ waterBody: WaterBody) async throws -> HydroState {
+        fetchCount += 1
+        switch outcome {
+        case let .success(state): return state
+        case .failure: throw RoutedHydroProviderError.noUsableMeasurements
+        }
+    }
+
+    func count() -> Int { fetchCount }
+}
+
 actor CancellationThenSuccessProvider: HydroStateProvider {
     private let canceledWaterBodyID: WaterBody.ID
     private let states: [WaterBody.ID: HydroState]
@@ -179,6 +201,101 @@ Check.expect(USGSIVAdapter.parseTimestamp("not-a-time") == nil, "malformed USGS 
 let tahoeState = try await usgsProvider.fetch(WaterBodies.lakeTahoe)
 Check.expect(tahoeState.waterLevel == usgsMeasurements.first?.measurement, "USGS provider assembles Lake Tahoe HydroState")
 Check.expect(tahoeState.waterTemperature == nil && tahoeState.windSpeed == nil, "USGS provider never fabricates uncovered fields")
+
+print("\nProvider routing and aggregation")
+let routeReference = USGSIVAdapter.parseTimestamp("2026-08-09T04:00:00Z")!
+let noaaRouteState = HydroState(
+    observedAt: routeReference.addingTimeInterval(-120),
+    retrievedAt: routeReference,
+    windSpeed: HydroMeasurement(
+        value: 8,
+        unit: .metersPerSecond,
+        origin: .observed,
+        quality: .good,
+        sourceID: "route.noaa.wind",
+        observedAt: routeReference.addingTimeInterval(-120)
+    )
+)
+let usgsRouteState = HydroState(
+    observedAt: routeReference.addingTimeInterval(-300),
+    retrievedAt: routeReference.addingTimeInterval(30),
+    waterLevel: HydroMeasurement(
+        value: 2.4,
+        unit: .meters,
+        origin: .observed,
+        quality: .unknown,
+        sourceID: "route.usgs.level",
+        observedAt: routeReference.addingTimeInterval(-300)
+    )
+)
+let mixedBody = WaterBody(
+    id: "mixed-route",
+    name: "Mixed Route",
+    region: "Test",
+    latitude: 0,
+    longitude: 0,
+    kind: .lake,
+    sourceBindings: [
+        HydroSourceBinding(namespace: "test.noaa", sourceID: "n", capabilities: [.wind]),
+        HydroSourceBinding(namespace: "test.usgs", sourceID: "u", capabilities: [.waterLevel]),
+    ]
+)
+private let fixedNOAA = FixedProvider(.success(noaaRouteState))
+private let fixedUSGS = FixedProvider(.success(usgsRouteState))
+let routed = RoutedHydroProvider(routes: [
+    HydroProviderRoute(namespaces: ["test.noaa"], provider: fixedNOAA),
+    HydroProviderRoute(namespaces: ["test.usgs"], provider: fixedUSGS),
+])
+let routedState = try await routed.fetch(mixedBody)
+Check.expect(routedState.windSpeed == noaaRouteState.windSpeed && routedState.waterLevel == usgsRouteState.waterLevel, "matching providers merge complementary signals")
+Check.expect(routedState.observedAt == usgsRouteState.observedAt, "routed aggregate uses oldest observation timestamp")
+Check.expect(routedState.retrievedAt == usgsRouteState.retrievedAt, "routed aggregate uses latest retrieval timestamp")
+let fixedNOAACount = await fixedNOAA.count()
+let fixedUSGSCount = await fixedUSGS.count()
+Check.expect(fixedNOAACount == 1 && fixedUSGSCount == 1, "each matching provider is fetched exactly once")
+
+private let failedRoute = FixedProvider(.failure)
+let partialRouted = RoutedHydroProvider(routes: [
+    HydroProviderRoute(namespaces: ["test.noaa"], provider: fixedNOAA),
+    HydroProviderRoute(namespaces: ["test.usgs"], provider: failedRoute),
+])
+let partialState = try await partialRouted.fetch(mixedBody)
+Check.expect(partialState.windSpeed == noaaRouteState.windSpeed && partialState.waterLevel == nil, "one provider failure preserves another provider's usable state")
+
+let collisionFirst = HydroState(
+    observedAt: routeReference,
+    retrievedAt: routeReference,
+    waterLevel: HydroMeasurement(value: 1, unit: .meters, origin: .observed, quality: .good, sourceID: "first")
+)
+let collisionSecond = HydroState(
+    observedAt: routeReference,
+    retrievedAt: routeReference,
+    waterLevel: HydroMeasurement(value: 2, unit: .meters, origin: .observed, quality: .good, sourceID: "second")
+)
+let collisionMerged = try HydroStateMerger.merge([collisionFirst, collisionSecond])
+Check.expect(collisionMerged.waterLevel?.sourceID == "first", "declared route order resolves signal collisions deterministically")
+do {
+    _ = try HydroStateMerger.merge([])
+    Check.expect(false, "empty aggregation fails safely")
+} catch let error as RoutedHydroProviderError {
+    Check.expect(error == .noUsableMeasurements, "empty aggregation fails safely")
+}
+
+do {
+    _ = try await RoutedHydroProvider(routes: []).fetch(mixedBody)
+    Check.expect(false, "missing route fails explicitly")
+} catch let error as RoutedHydroProviderError {
+    Check.expect(error == .noMatchingProvider, "missing route fails explicitly")
+}
+do {
+    let allFailed = RoutedHydroProvider(routes: [
+        HydroProviderRoute(namespaces: ["test.noaa", "test.usgs"], provider: failedRoute),
+    ])
+    _ = try await allFailed.fetch(mixedBody)
+    Check.expect(false, "all matching provider failures remain unavailable")
+} catch let error as RoutedHydroProviderError {
+    Check.expect(error == .noUsableMeasurements, "all matching provider failures remain unavailable")
+}
 
 print("\nNOAA adapter")
 let level = try NOAAHydroAdapter.decode(

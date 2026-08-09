@@ -5,6 +5,7 @@ enum SettingsKey {
     static let themeID = "themeID"
     static let energy = "energy"
     static let hapticsEnabled = "hapticsEnabled"
+    static let placeID = "placeID"
 }
 
 /// Crown range for the energy multiplier.

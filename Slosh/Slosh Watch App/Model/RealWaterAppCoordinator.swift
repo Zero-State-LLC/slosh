@@ -1,4 +1,3 @@
-#if DEBUG && targetEnvironment(simulator)
 import Foundation
 import HydroProviders
 import OceanCore
@@ -6,7 +5,7 @@ import OSLog
 
 private struct UnavailableHydroProvider: HydroStateProvider {
     func fetch(_ waterBody: WaterBody) async throws -> HydroState {
-        throw NOAAProviderError.noUsableMeasurements
+        throw RoutedHydroProviderError.noUsableMeasurements
     }
 }
 
@@ -25,7 +24,7 @@ final class RealWaterAppCoordinator {
         if forceFailure {
             coordinator = LiveHydroCoordinator(provider: UnavailableHydroProvider())
         } else {
-            coordinator = LiveHydroCoordinator(provider: LiveNOAACOOPSProvider())
+            coordinator = LiveHydroCoordinator(provider: RoutedHydroProvider.liveCurated())
         }
     }
 
@@ -48,7 +47,7 @@ final class RealWaterAppCoordinator {
             case .unavailable:
                 // No prior observation means there is nothing environmental to
                 // apply. The authored Calm ocean has kept rendering throughout.
-                Self.logger.notice("RW2B real-water unavailable; authored ocean preserved")
+                Self.logger.notice("RW3A real-water unavailable; authored ocean preserved")
             }
         }
     }
@@ -73,10 +72,9 @@ final class RealWaterAppCoordinator {
             state.pressure.map { "pressure=\($0.value)hPa" },
             state.salinity.map { "salinity=\($0.value)PSU" },
         ].compactMap { $0 }.joined(separator: ",")
-        let message = "RW2B real-water \(disposition) observedAt=\(state.observedAt) "
+        let message = "RW3A real-water \(disposition) observedAt=\(state.observedAt) "
             + "fields=[\(fields)] freshness=\(experience.forcing.freshness.rawValue) "
             + "forcing=\(experience.forcing) modifiers=\(experience.themeModifiers)"
         Self.logger.notice("\(message, privacy: .public)")
     }
 }
-#endif

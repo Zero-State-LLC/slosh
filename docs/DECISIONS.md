@@ -178,3 +178,17 @@ changes, while assuming uniform coverage would invite fabricated defaults. The
 catalog therefore records opaque provider bindings and derives a complete
 `observed` / `unavailable` map from their reviewed capabilities. NOAA and USGS
 DTOs, quality flags, units, and request vocabulary remain in `HydroProviders`.
+
+---
+
+## 12. Provider routing at the application boundary
+
+**Decision:** compose providers by opaque binding namespace immediately before
+`LiveHydroCoordinator`, not inside `OceanCore` and not in the renderer.
+
+A curated place may eventually need more than one provider. Matching routes run
+independently so one outage does not discard another provider's usable evidence.
+Successful states merge deterministically in declared route order, with no
+fabricated fields. Selecting a new place clears the previously applied Hydro
+experience before fetching, so one place is never shown using another place's
+forcing while the replacement is loading or unavailable.

@@ -194,8 +194,12 @@ relevant product foundation is sound.
   and USGS NWIS inland gage height.
 - Every place publishes explicit `observed` or `unavailable` status for every
   Hydro capability instead of promising uniform coverage.
-- **Next:** RW3A — compose provider selection at the application boundary and add
-  deliberate Places selection UX. Automatic discovery remains out of scope.
+- **RW3A complete:** provider routes compose by opaque namespace, tolerate
+  partial failure, and merge successful states deterministically. The watch
+  picker persists deliberate selection of any curated Place and clears prior
+  forcing before switching.
+- **Next:** RW3B — Place status, freshness, and provenance presentation.
+  Automatic discovery remains out of scope.
 
 ### RW4 — iPhone geographic discovery
 

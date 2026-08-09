@@ -39,8 +39,9 @@ built, rejected and thrown away.
 Slosh contains authored water **Experiences**. An experimental DEBUG simulator
 vertical slice renders San Francisco Bay, while the reviewed Real Water catalog
 now also describes Monterey Bay and Lake Tahoe with explicit partial coverage.
-NOAA CO-OPS and USGS NWIS observations stay behind provider-independent Hydro
-contracts. This is not general geographic support or a Places UI; see
+The watch picker can select those curated Places; NOAA CO-OPS and USGS NWIS
+observations stay behind provider-independent Hydro contracts. This is not
+general geographic discovery; see
 [docs/REAL_WATER.md](docs/REAL_WATER.md) for coverage and provenance rules.
 
 ## Status

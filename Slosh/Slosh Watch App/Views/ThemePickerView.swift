@@ -8,7 +8,8 @@ import WatchKit
 /// point is that the themes *move* differently, which a static colour chip
 /// cannot show.
 struct ThemePickerView: View {
-    @Binding var selectedID: String
+    @Binding var selectedThemeID: String
+    @Binding var selectedPlaceID: String
     @Binding var hapticsEnabled: Bool
     @Environment(\.dismiss) private var dismiss
 
@@ -19,9 +20,10 @@ struct ThemePickerView: View {
             ForEach(OceanTheme.all) { theme in
                 ThemePage(
                     theme: theme,
-                    isCurrent: theme.id == selectedID,
+                    isCurrent: selectedPlaceID.isEmpty && theme.id == selectedThemeID,
                     choose: {
-                        selectedID = theme.id
+                        selectedPlaceID = ""
+                        selectedThemeID = theme.id
                         WKInterfaceDevice.current().play(.click)
                         dismiss()
                     }
@@ -29,11 +31,99 @@ struct ThemePickerView: View {
                 .tag(theme.id)
             }
 
+            ForEach(WaterBodies.all) { waterBody in
+                PlacePage(
+                    waterBody: waterBody,
+                    isCurrent: waterBody.id == selectedPlaceID,
+                    choose: {
+                        selectedPlaceID = waterBody.id
+                        WKInterfaceDevice.current().play(.click)
+                        dismiss()
+                    }
+                )
+                .tag("place:\(waterBody.id)")
+            }
+
             SettingsPage(hapticsEnabled: $hapticsEnabled)
                 .tag("settings")
         }
         .tabViewStyle(.verticalPage)
-        .onAppear { page = selectedID }
+        .onAppear {
+            page = selectedPlaceID.isEmpty ? selectedThemeID : "place:\(selectedPlaceID)"
+        }
+    }
+}
+
+private struct PlacePage: View {
+    let waterBody: WaterBody
+    let isCurrent: Bool
+    let choose: () -> Void
+
+    private var observed: String {
+        HydroCapability.allCases
+            .filter { waterBody.coverage[$0] == .observed }
+            .map(\.displayName)
+            .joined(separator: " · ")
+    }
+
+    private var unavailableCount: Int {
+        HydroCapability.allCases.filter { waterBody.coverage[$0] == .unavailable }.count
+    }
+
+    var body: some View {
+        VStack(spacing: 7) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color(red: 0.03, green: 0.24, blue: 0.38),
+                                     Color(red: 0.01, green: 0.08, blue: 0.16)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                Image(systemName: waterBody.kind == .lake ? "mountain.2.fill" : "water.waves")
+                    .font(.system(size: 30))
+                    .foregroundStyle(.cyan)
+            }
+            .frame(height: 74)
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(isCurrent ? .cyan : .clear, lineWidth: 2)
+            }
+
+            Text(waterBody.name).font(.headline)
+            Text(waterBody.region)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text("Live: \(observed)")
+                .font(.caption2)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+            Text("\(unavailableCount) unavailable")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            Button(isCurrent ? "Current place" : "Wear this place", action: choose)
+                .disabled(isCurrent)
+                .buttonStyle(.bordered)
+                .tint(.cyan)
+        }
+        .padding(.horizontal, 8)
+    }
+}
+
+private extension HydroCapability {
+    var displayName: String {
+        switch self {
+        case .waterLevel: "Level"
+        case .waterTemperature: "Temperature"
+        case .wind: "Wind"
+        case .airPressure: "Pressure"
+        case .salinity: "Salinity"
+        case .currentSpeed: "Current speed"
+        case .currentDirection: "Current direction"
+        }
     }
 }
 
@@ -101,7 +191,8 @@ private struct SettingsPage: View {
 
 #Preview {
     ThemePickerView(
-        selectedID: .constant(OceanTheme.calmOcean.id),
+        selectedThemeID: .constant(OceanTheme.calmOcean.id),
+        selectedPlaceID: .constant(""),
         hapticsEnabled: .constant(true)
     )
 }

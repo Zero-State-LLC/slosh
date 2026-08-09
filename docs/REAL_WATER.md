@@ -316,8 +316,37 @@ mode, persistent caching, or arbitrary geographic search.
 
 RW2C completed multi-place provenance and per-signal freshness hardening. RW3
 adds the reviewed three-place catalog and explicit coverage model without adding
-a Places UI. The next slice is **RW3A — Multi-provider application composition
-and Places selection UX**.
+a Places UI.
+
+### Multi-provider application composition and Places selection
+
+RW3A adds `RoutedHydroProvider`, whose routes own sets of opaque source-binding
+namespaces. Only matching routes fetch a selected place. Successful provider
+states merge deterministically; the oldest observation timestamp remains the
+conservative summary, the latest retrieval timestamp records completion, and
+earlier declared routes win only if providers collide on one canonical signal.
+One provider failure does not erase another provider's usable state. If every
+matching route fails, the place remains unavailable and authored Calm ocean is
+preserved.
+
+The watch picker now presents authored Experiences and the three curated Places.
+Place selection persists by canonical `WaterBody.id`. Switching place first
+clears the previously applied Hydro experience, preventing cross-place forcing
+from appearing during the next fetch. Lifecycle cancellation, ten-minute
+per-place throttling, and per-place fallback continue to be owned by
+`LiveHydroCoordinator`.
+
+Debug simulator launch arguments accept every curated ID:
+
+```bash
+-realWater san-francisco-bay
+-realWater monterey-bay
+-realWater lake-tahoe
+```
+
+The next slice is **RW3B — Place status, freshness, and provenance presentation**
+so the selection UI can communicate loading, unavailable, stale, and source
+details rather than expressing state only through the water.
 USGS Water Data and NOAA ERDDAP remain future options only where they contribute
 a distinct, reviewed measurement.
 
