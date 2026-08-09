@@ -230,9 +230,16 @@ relevant product foundation is sound.
 - Physical Watch synchronization is **NOT_RUN** because no accessible paired
   physical Apple Watch is available. Fake transport tests cover canonical IDs
   and ordering, not actual companion delivery.
-- **Next: RW4B — geographic map browsing over the existing curated catalog.**
-  Keep arbitrary station discovery, remote Place search, and provider concerns
-  out of `OceanCore`.
+- **RW4B complete:** MapKit now plots the three canonical product Places using
+  `WaterBody` coordinates. Map and list share current selection and keyed status,
+  pin inspection reuses the existing detail screen without mutating worn water,
+  and only the explicit wear action persists and transports selection.
+- Map annotations remain available offline and never expose provider stations as
+  product pins. Search is local to the reviewed catalog.
+- **Next: RW4C — Arbitrary Geographic Discovery Feasibility & Dataset Resolution
+  Research.** Determine whether geographic water selection can be matched to a
+  trustworthy dataset without confusing nearest sensor with same water body.
+  Automatic discovery is not implemented.
 
 ### RW5 — Historical playback
 

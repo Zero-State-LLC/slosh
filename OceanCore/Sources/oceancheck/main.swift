@@ -563,7 +563,50 @@ Check.suite("iPhone Places selection foundation") {
                 waterBody.latitude.isFinite && waterBody.longitude.isFinite,
                 "\(waterBody.name) lost map-ready coordinates"
             )
+            Check.expect(!waterBody.id.isEmpty, "catalog contains an empty Place id")
+            Check.expect((-90 ... 90).contains(waterBody.latitude), "latitude is out of range")
+            Check.expect((-180 ... 180).contains(waterBody.longitude), "longitude is out of range")
         }
+        Check.equal(Set(WaterBodies.all.map(\.id)).count, WaterBodies.all.count, "Place ids repeat")
+        let coordinates = WaterBodies.all.map { "\($0.latitude),\($0.longitude)" }
+        Check.equal(Set(coordinates).count, coordinates.count, "Place coordinates repeat")
+    }
+
+    Check.test("map annotations derive only from the curated catalog") {
+        let snapshot = CuratedPlacesMapSnapshot(
+            observations: PlaceObservationStore(),
+            selectedPlaceID: WaterBodies.montereyBay.id
+        )
+        Check.equal(snapshot.annotations.map(\.id), WaterBodies.all.map(\.id))
+        Check.equal(snapshot.annotations.map(\.latitude), WaterBodies.all.map(\.latitude))
+        Check.equal(snapshot.annotations.map(\.longitude), WaterBodies.all.map(\.longitude))
+        Check.equal(snapshot.annotations.filter(\.isCurrent).map(\.id), [WaterBodies.montereyBay.id])
+        Check.expect(
+            snapshot.annotations.allSatisfy { !$0.coverageSummary.isEmpty },
+            "offline annotations lost reviewed coverage"
+        )
+    }
+
+    Check.test("map annotation status reuses Place observation state") {
+        var store = PlaceObservationStore()
+        store.beginLoading(WaterBodies.sanFranciscoBay.id)
+        store.accept(.unavailable, for: WaterBodies.lakeTahoe.id)
+        let annotations = CuratedPlacesMapSnapshot(
+            observations: store,
+            selectedPlaceID: nil
+        ).annotations
+        Check.equal(annotations.first { $0.id == WaterBodies.sanFranciscoBay.id }?.statusText, "Loading")
+        Check.equal(annotations.first { $0.id == WaterBodies.lakeTahoe.id }?.statusText, "Unavailable")
+        Check.equal(annotations.first { $0.id == WaterBodies.montereyBay.id }?.statusText, "Reviewed coverage")
+    }
+
+    Check.test("map browsing does not change the worn Place") {
+        var browsing = CuratedPlaceBrowsingState(selectedPlaceID: WaterBodies.sanFranciscoBay.id)
+        browsing.inspect(WaterBodies.lakeTahoe.id)
+        Check.equal(browsing.inspectedPlaceID, WaterBodies.lakeTahoe.id)
+        Check.equal(browsing.selectedPlaceID, WaterBodies.sanFranciscoBay.id)
+        browsing.wearInspectedPlace()
+        Check.equal(browsing.selectedPlaceID, WaterBodies.lakeTahoe.id)
     }
 
     Check.test("selection persistence round trips canonical Place identity") {

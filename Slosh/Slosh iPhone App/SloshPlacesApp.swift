@@ -1,4 +1,5 @@
 import Foundation
+import MapKit
 import OceanCore
 import SwiftUI
 
@@ -12,8 +13,22 @@ struct SloshPlacesApp: App {
 }
 
 struct PlacesBrowserView: View {
+    private enum BrowserMode: String, CaseIterable, Identifiable {
+        case map = "Map"
+        case list = "List"
+
+        var id: Self { self }
+    }
+
     @State private var model = PlacesAppModel()
     @State private var searchText = ""
+    @State private var mode: BrowserMode = {
+        #if DEBUG
+        BrowserMode(rawValue: UserDefaults.standard.string(forKey: "browserMode") ?? "") ?? .list
+        #else
+        .list
+        #endif
+    }()
     @State private var path: [WaterBody.ID] = {
         #if DEBUG
         guard let id = UserDefaults.standard.string(forKey: "openPlace"),
@@ -34,26 +49,169 @@ struct PlacesBrowserView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            List(filteredPlaces) { waterBody in
-                NavigationLink(value: waterBody.id) {
-                    PlaceRow(
-                        waterBody: waterBody,
-                        state: model.state(for: waterBody),
-                        isSelected: model.selectedPlaceID == waterBody.id
+            Group {
+                switch mode {
+                case .map:
+                    CuratedPlacesMapView(
+                        model: model,
+                        waterBodies: filteredPlaces
                     )
+                case .list:
+                    List(filteredPlaces) { waterBody in
+                        NavigationLink(value: waterBody.id) {
+                            PlaceRow(
+                                waterBody: waterBody,
+                                state: model.state(for: waterBody),
+                                isSelected: model.selectedPlaceID == waterBody.id
+                            )
+                        }
+                    }
+                    .listStyle(.insetGrouped)
+                    .refreshable { await model.refreshAll() }
                 }
             }
-            .listStyle(.insetGrouped)
             .navigationTitle("Places")
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Picker("Browse Places", selection: $mode) {
+                        ForEach(BrowserMode.allCases) { mode in
+                            Text(mode.rawValue).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 180)
+                    .accessibilityHint("Switch between geographic map and curated list")
+                }
+            }
             .navigationDestination(for: WaterBody.ID.self) { id in
                 if let waterBody = WaterBodies.body(id: id) {
                     PlaceDetailView(waterBody: waterBody, model: model)
                 }
             }
             .searchable(text: $searchText, prompt: "Search Places")
-            .refreshable { await model.refreshAll() }
             .task { await model.refreshAll() }
         }
+    }
+}
+
+private struct CuratedPlacesMapView: View {
+    let model: PlacesAppModel
+    let waterBodies: [WaterBody]
+
+    @State private var inspectedPlace: WaterBody?
+    @State private var position: MapCameraPosition
+
+    init(model: PlacesAppModel, waterBodies: [WaterBody]) {
+        self.model = model
+        self.waterBodies = waterBodies
+        _position = State(initialValue: .region(Self.initialRegion(selectedPlaceID: model.selectedPlaceID)))
+        #if DEBUG
+        if let id = UserDefaults.standard.string(forKey: "inspectPlace") {
+            _inspectedPlace = State(initialValue: WaterBodies.body(id: id))
+        }
+        #endif
+    }
+
+    private var annotations: [CuratedPlaceMapAnnotation] {
+        CuratedPlacesMapSnapshot(
+            waterBodies: waterBodies,
+            observations: model.observations,
+            selectedPlaceID: model.selectedPlaceID
+        ).annotations
+    }
+
+    var body: some View {
+        Map(position: $position) {
+            ForEach(annotations) { annotation in
+                Annotation(
+                    annotation.name,
+                    coordinate: CLLocationCoordinate2D(
+                        latitude: annotation.latitude,
+                        longitude: annotation.longitude
+                    ),
+                    anchor: .bottom
+                ) {
+                    Button {
+                        inspectedPlace = WaterBodies.body(id: annotation.id)
+                    } label: {
+                        VStack(spacing: 3) {
+                            Image(systemName: annotation.isCurrent ? "checkmark.circle.fill" : "drop.circle.fill")
+                                .font(.title)
+                                .foregroundStyle(annotation.isCurrent ? .blue : .cyan)
+                                .background(.background, in: Circle())
+                            Text(annotation.name)
+                                .font(.caption.bold())
+                            Text(annotation.statusText)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(6)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        "\(annotation.name), \(annotation.statusText)\(annotation.isCurrent ? ", currently selected" : "")"
+                    )
+                    .accessibilityHint("Opens the existing Place detail without changing the worn Place")
+                }
+            }
+        }
+        .mapStyle(.standard(pointsOfInterest: .excludingAll))
+        .overlay(alignment: .bottom) {
+            Text("Pins are reviewed Slosh Places, not sensor stations")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(.regularMaterial, in: Capsule())
+                .padding(.bottom, 12)
+                .accessibilityLabel("Map shows reviewed Slosh Places, not sensor stations")
+        }
+        .sheet(item: $inspectedPlace) { waterBody in
+            NavigationStack {
+                PlaceDetailView(waterBody: waterBody, model: model)
+            }
+        }
+        .onChange(of: model.selectedPlaceID) { _, selectedPlaceID in
+            guard let selectedPlaceID,
+                  let waterBody = WaterBodies.body(id: selectedPlaceID) else { return }
+            withAnimation {
+                position = .region(Self.region(around: waterBody))
+            }
+        }
+        .accessibilityLabel("Curated Places map")
+    }
+
+    private static func initialRegion(selectedPlaceID: WaterBody.ID?) -> MKCoordinateRegion {
+        if let selectedPlaceID, let selected = WaterBodies.body(id: selectedPlaceID) {
+            return region(around: selected)
+        }
+        let latitudes = WaterBodies.all.map(\.latitude)
+        let longitudes = WaterBodies.all.map(\.longitude)
+        let minLatitude = latitudes.min() ?? 36
+        let maxLatitude = latitudes.max() ?? 40
+        let minLongitude = longitudes.min() ?? -123
+        let maxLongitude = longitudes.max() ?? -120
+        return MKCoordinateRegion(
+            center: CLLocationCoordinate2D(
+                latitude: (minLatitude + maxLatitude) / 2,
+                longitude: (minLongitude + maxLongitude) / 2
+            ),
+            span: MKCoordinateSpan(
+                latitudeDelta: max(1.2, (maxLatitude - minLatitude) * 1.55),
+                longitudeDelta: max(1.2, (maxLongitude - minLongitude) * 1.55)
+            )
+        )
+    }
+
+    private static func region(around waterBody: WaterBody) -> MKCoordinateRegion {
+        MKCoordinateRegion(
+            center: CLLocationCoordinate2D(
+                latitude: waterBody.latitude,
+                longitude: waterBody.longitude
+            ),
+            span: MKCoordinateSpan(latitudeDelta: 1.25, longitudeDelta: 1.25)
+        )
     }
 }
 

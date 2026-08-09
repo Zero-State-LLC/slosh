@@ -2,14 +2,14 @@
 
 # Slosh
 
-**An ocean on your wrist.**
+**Wear water on Apple Watch. Discover it on iPhone.**
 
 You are looking straight down into water. Tilt the watch and the swell rolls that
 way. Shake it and the surface stirs, throws a wave in from the edge, and breaks
 into foam. Tap it and a ripple spreads. Fifteen modes, each a different substance
 rather than a different palette.
 
-Apple Watch · watchOS 10+ · SwiftUI + SpriteKit
+Apple Watch + iPhone · watchOS 10+ · iOS 17+ · SwiftUI + SpriteKit + MapKit
 
 <img src="media/calm-ocean.gif" width="180" alt="Calm ocean"> <img src="media/breaking-surf.gif" width="180" alt="Breaking surf"> <img src="media/rain-shower.gif" width="180" alt="Rain shower">
 
@@ -47,13 +47,20 @@ general geographic discovery; see
 The watch picker exposes compact freshness and exact source provenance while
 keeping the full-screen water experience free of telemetry.
 
+The iPhone app is the discovery/configuration surface. It browses the same three
+reviewed Places as a list or geographic MapKit map, opens the shared status and
+provenance detail, and changes the worn Place only after an explicit **Wear this
+water** action. Map pins are canonical water bodies, not NOAA or USGS stations.
+Arbitrary geographic discovery is not implemented.
+
 ## Status
 
 | | |
 |---|---|
 | Builds and runs on the watchOS simulator | ✅ |
 | All fifteen modes render | ✅ |
-| Automated checks (`swift run oceancheck`) | ✅ 340 assertions |
+| iPhone curated list and geographic map | ✅ |
+| Automated checks (`swift run oceancheck`) | ✅ 382 assertions |
 | **Run on physical hardware** | ❌ **never** |
 | Frame rate and battery profiled | ❌ |
 | Submitted to the App Store | ❌ |
@@ -87,7 +94,7 @@ OceanCore/                  Swift package — builds and tests without Xcode
   Sources/oceancheck/          existing water behavior checks
   Sources/hydrocheck/          deterministic Hydro translation checks
   Sources/providercheck/       offline NOAA fixtures and optional live smoke test
-Slosh/                      the watchOS app
+Slosh/                      watchOS experiential app + iPhone Places browser
 docs/                       architecture, modes, decisions, economics, roadmap
 media/                      captures used by the docs
 ```
@@ -108,8 +115,9 @@ swift run providercheck
 The provider suite is offline by default. `swift run providercheck --live` adds
 an observational, non-deterministic NOAA smoke test.
 
-340 assertions over flow direction, surge, ripples, rain, lightning, the bowl
-centre and the mode catalogue.
+382 assertions over flow direction, surge, ripples, rain, lightning, the bowl
+centre, mode catalogue, physical-validation metrics, and curated Places
+selection/map contracts.
 
 **Why not XCTest.** XCTest ships only inside Xcode. Writing the suite as a plain
 executable means it runs anywhere the Swift toolchain does — including CI images

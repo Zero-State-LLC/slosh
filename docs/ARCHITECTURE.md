@@ -95,6 +95,19 @@ additive adapter to its existing theme/place settings, avoiding a risky picker
 migration. Physical companion delivery remains unverified until a paired Watch
 is available.
 
+RW4B adds MapKit only in the iPhone application target. The portable
+`CuratedPlacesMapSnapshot` derives annotation identity, coordinates, reviewed
+coverage, compact load status, and current-selection state from `WaterBodies.all`
+and the existing `PlaceObservationStore`. It contains no MapKit type and no
+provider station vocabulary.
+
+Map and list are two projections over the same `PlacesAppModel`. Inspecting a
+pin holds a transient `WaterBody` for presentation and reuses `PlaceDetailView`;
+it does not persist or transmit selection. Only the existing explicit wear
+action calls the established selection persistence and transport path. The
+camera initially fits the complete catalog, or centers around the current worn
+Place when one exists. Arbitrary camera state is not persisted.
+
 ## Rendering
 
 ### Physical validation instrumentation

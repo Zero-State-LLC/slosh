@@ -40,6 +40,16 @@ final class PlacesAppModel {
            saved.selection.isCatalogValid {
             selectedEnvelope = saved
         }
+        #if DEBUG
+        if let selectedPlaceID = defaults.string(forKey: "selectedPlace"),
+           WaterBodies.body(id: selectedPlaceID) != nil {
+            selectedEnvelope = WaterSelectionEnvelope(
+                selection: .place(waterBodyID: selectedPlaceID),
+                selectedAt: Date(timeIntervalSince1970: 1),
+                origin: .iphone
+            )
+        }
+        #endif
         WatchSelectionTransport.shared.onReceive = { [weak self] envelope in
             Task { @MainActor in self?.receive(envelope) }
         }

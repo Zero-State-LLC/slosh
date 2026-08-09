@@ -30,6 +30,26 @@ boundary. The most recent deliberate selection wins after reconnection. RW4A
 does not add a map, remote Place search, station discovery, polling, or a new
 renderer.
 
+### Curated geographic map
+
+RW4B presents the same reviewed catalog through a MapKit map and the existing
+list. Every annotation is derived from a canonical `WaterBody.id`, latitude, and
+longitude. A pin represents San Francisco Bay, Monterey Bay, or Lake Tahoe as a
+product Place. It never represents NOAA station `9414290`, current station
+`s09010`, USGS site `10337000`, or any other sensor.
+
+The map consumes the same keyed observation store and provider-independent Place
+status used by the list. It remains complete offline and shows loading,
+freshness, preserved, or unavailable state without removing Places. Tapping a
+pin is transient browsing and opens the existing `PlaceDetailView`; it does not
+change the worn water. Only **Wear this water** persists a canonical selection
+and sends it through the existing Watch transport boundary.
+
+The default camera fits all reviewed Places when no Place is selected and centers
+reasonably around the current selected Place otherwise. Search remains local to
+the curated catalog. MapKit search, geocoding, station discovery, nearest-sensor
+matching, and dynamic WaterBody creation do not exist.
+
 ## Two domains
 
 - **Experiences** are the existing authored `OceanTheme` modes. They define a
