@@ -65,6 +65,15 @@ in declared route order. The merged summary uses the oldest observation and
 latest retrieval timestamps. `LiveHydroCoordinator` then applies its existing
 per-place throttle and cache policy to that composed provider.
 
+`PlaceHydroStatusResolver` is the presentation boundary. It combines catalog
+coverage with an optional provider-independent `HydroState` at an explicit
+reference date. SwiftUI consumes only that status, never NOAA or USGS DTOs.
+Signal freshness delegates to `HydroInterpreter`'s authoritative predicate.
+The watch coordinator scopes load state and result application by canonical
+`WaterBody.id` and request generation, so cancellation races cannot display one
+Place's status or forcing after another Place becomes active, or let an older
+activation overwrite a newer request for the same Place.
+
 ## Rendering
 
 Everything visible derives from **one analytic height field**, evaluated per

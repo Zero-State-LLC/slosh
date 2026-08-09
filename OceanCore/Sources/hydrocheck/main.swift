@@ -634,6 +634,246 @@ Check.expect(
 let repeated = (0..<20).map { _ in interpreter.interpret(HydroFixtures.severe, referenceDate: referenceDate) }
 Check.expect(repeated.allSatisfy { $0 == severe }, "fixture output must be deterministic across repeated runs")
 
+print("Place status presentation")
+let statusResolver = PlaceHydroStatusResolver()
+let statusBody = WaterBodies.sanFranciscoBay
+let freshTime = referenceDate.addingTimeInterval(-7 * 60)
+let staleTime = referenceDate.addingTimeInterval(-90 * 60)
+let statusState = HydroState(
+    observedAt: freshTime,
+    retrievedAt: referenceDate,
+    waterLevel: measurement(1.2, .meters, observedAt: freshTime, id: "noaa.coops.9414290.water_level"),
+    currentSpeed: measurement(0.8, .metersPerSecond, observedAt: freshTime, id: "noaa.coops.s09010.currents.speed"),
+    windSpeed: measurement(4.2, .metersPerSecond, observedAt: freshTime, id: "noaa.coops.9414290.wind.speed")
+)
+let presented = statusResolver.resolve(
+    waterBody: statusBody,
+    state: statusState,
+    referenceDate: referenceDate
+)
+Check.expect(
+    presented.signals.count == HydroCapability.allCases.count,
+    "every canonical Hydro capability must produce a presentation status"
+)
+Check.expect(
+    presented.signal(.waterLevel)?.observationAvailability == .observed,
+    "catalog supported plus current measurement must present observed"
+)
+Check.expect(
+    presented.signal(.waterTemperature)?.observationAvailability == .unavailable,
+    "catalog unsupported capability must present unavailable"
+)
+let noObservation = statusResolver.resolve(
+    waterBody: statusBody,
+    state: HydroState(observedAt: freshTime, retrievedAt: referenceDate),
+    referenceDate: referenceDate
+)
+Check.expect(
+    noObservation.signal(.waterLevel)?.observationAvailability == .missing,
+    "supported capability without a measurement must present missing current observation"
+)
+
+var staleStatusState = statusState
+staleStatusState.currentSpeed?.observedAt = staleTime
+let stalePresented = statusResolver.resolve(
+    waterBody: statusBody,
+    state: staleStatusState,
+    referenceDate: referenceDate
+)
+Check.expect(
+    stalePresented.signal(.currentSpeed)?.observationAvailability == .stale,
+    "supported stale measurement must present stale"
+)
+Check.expect(
+    stalePresented.signal(.currentSpeed)?.measurements.first?.value == 0.8,
+    "stale status must preserve the raw measurement"
+)
+
+var suspectStatusState = statusState
+suspectStatusState.waterLevel?.quality = .suspect
+let suspectPresented = statusResolver.resolve(
+    waterBody: statusBody,
+    state: suspectStatusState,
+    referenceDate: referenceDate
+)
+Check.expect(
+    suspectPresented.signal(.waterLevel)?.observationAvailability == .observed,
+    "timely suspect evidence must remain visibly observed"
+)
+Check.expect(
+    suspectPresented.signal(.waterLevel)?.usableForForcing == false,
+    "suspect evidence must be marked not used"
+)
+var unknownStatusState = statusState
+unknownStatusState.waterLevel?.quality = .unknown
+let unknownPresented = statusResolver.resolve(
+    waterBody: statusBody,
+    state: unknownStatusState,
+    referenceDate: referenceDate
+)
+Check.expect(
+    unknownPresented.signal(.waterLevel)?.usableForForcing == true,
+    "unknown-quality evidence must remain usable"
+)
+var fallbackTimestampState = statusState
+fallbackTimestampState.waterLevel?.observedAt = nil
+let fallbackTimestampStatus = statusResolver.resolve(
+    waterBody: statusBody,
+    state: fallbackTimestampState,
+    referenceDate: referenceDate
+)
+Check.expect(
+    fallbackTimestampStatus.signal(.waterLevel)?
+        .effectiveObservedAtBySourceID["noaa.coops.9414290.water_level"] == freshTime,
+    "missing measurement timestamp must present the state observation fallback"
+)
+
+let speedOnlyCurrent = presented.displaySignals.first { $0.signal == .current }
+Check.expect(
+    speedOnlyCurrent?.observationAvailability == .observed
+        && speedOnlyCurrent?.measurements.count == 1,
+    "current grouping must present speed-only observations without inventing direction"
+)
+var directionOnlyState = HydroState(observedAt: freshTime, retrievedAt: referenceDate)
+directionOnlyState.currentDirection = measurement(
+    225, .degreesTrue, convention: .toward, observedAt: freshTime,
+    id: "noaa.coops.s09010.currents.direction"
+)
+let directionOnly = statusResolver.resolve(
+    waterBody: statusBody,
+    state: directionOnlyState,
+    referenceDate: referenceDate
+).displaySignals.first { $0.signal == .current }
+Check.expect(
+    directionOnly?.observationAvailability == .observed
+        && directionOnly?.measurements.count == 1,
+    "current grouping must present direction-only observations without inventing speed"
+)
+let windOnly = presented.displaySignals.first { $0.signal == .wind }
+Check.expect(
+    windOnly?.measurements.count == 1 && windOnly?.usableForForcing == true,
+    "wind grouping must preserve partial speed-only fields"
+)
+
+let noaaSource = HydroPresentationFormatter.source("noaa.coops.9414290.water_level")
+Check.expect(
+    noaaSource.providerName == "NOAA CO-OPS"
+        && noaaSource.sourceName == "Station 9414290"
+        && noaaSource.canonicalSourceID == "noaa.coops.9414290.water_level",
+    "NOAA source presentation must be deterministic and retain canonical identity"
+)
+let usgsSource = HydroPresentationFormatter.source("usgs.nwis.10337000.00065")
+Check.expect(
+    usgsSource.providerName == "USGS"
+        && usgsSource.sourceName == "Site 10337000"
+        && usgsSource.canonicalSourceID == "usgs.nwis.10337000.00065",
+    "USGS source presentation must be deterministic and retain canonical identity"
+)
+Check.expect(
+    HydroPresentationFormatter.age(
+        observedAt: referenceDate.addingTimeInterval(-7 * 60),
+        referenceDate: referenceDate
+    ) == "Observed 7 min ago",
+    "minute freshness formatting must be deterministic"
+)
+Check.expect(
+    HydroPresentationFormatter.age(
+        observedAt: referenceDate.addingTimeInterval(-2 * 60 * 60),
+        referenceDate: referenceDate
+    ) == "Observed 2 hr ago",
+    "hour freshness formatting must be deterministic"
+)
+Check.expect(
+    HydroPresentationFormatter.quality(.unknown, used: true) == "Provisional / Unknown",
+    "unknown quality wording must not imply invalid data"
+)
+Check.expect(
+    HydroPresentationFormatter.quality(.suspect, used: false) == "Suspect · not used",
+    "suspect quality wording must disclose that it does not drive water"
+)
+Check.expect(
+    HydroPresentationFormatter.origin(.forecast) == "Forecast"
+        && HydroPresentationFormatter.origin(.predicted) == "Predicted"
+        && HydroPresentationFormatter.origin(.derived) == "Derived",
+    "origin wording must cover future Real Water products"
+)
+
+print("Active Place load-state boundary")
+let bodyA = WaterBodies.sanFranciscoBay
+let bodyB = WaterBodies.montereyBay
+let statusA = statusResolver.resolve(waterBody: bodyA, state: statusState, referenceDate: referenceDate)
+let statusB = statusResolver.resolve(waterBody: bodyB, state: nil, referenceDate: referenceDate)
+var loadReducer = RealWaterLoadReducer()
+let requestA = loadReducer.beginLoading(waterBodyID: bodyA.id)
+Check.expect(loadReducer.state == .loading(bodyA.id), "selection must start loading for the selected Place ID")
+let requestB = loadReducer.beginLoading(waterBodyID: bodyB.id)
+Check.expect(loadReducer.state == .loading(bodyB.id), "switching Place must clear the old status")
+Check.expect(
+    loadReducer.accept(
+        .updated,
+        status: statusA,
+        waterBodyID: bodyA.id,
+        requestGeneration: requestA
+    ) == false,
+    "late result for an old Place must be rejected"
+)
+Check.expect(
+    loadReducer.state == .loading(bodyB.id),
+    "late result for an old Place must not overwrite the new Place loading state"
+)
+Check.expect(
+    loadReducer.accept(
+        .updated,
+        status: statusB,
+        waterBodyID: bodyB.id,
+        requestGeneration: requestB
+    ),
+    "updated active Place result must be accepted"
+)
+Check.expect(loadReducer.state == .loaded(statusB), "updated active Place must publish loaded status")
+let olderSamePlaceRequest = loadReducer.beginLoading(waterBodyID: bodyB.id)
+let newerSamePlaceRequest = loadReducer.beginLoading(waterBodyID: bodyB.id)
+Check.expect(
+    loadReducer.accept(
+        .updated,
+        status: statusB,
+        waterBodyID: bodyB.id,
+        requestGeneration: olderSamePlaceRequest
+    ) == false && loadReducer.state == .loading(bodyB.id),
+    "older generation for the same Place must not overwrite its newer activation"
+)
+Check.expect(
+    loadReducer.accept(
+        .updated,
+        status: statusB,
+        waterBodyID: bodyB.id,
+        requestGeneration: newerSamePlaceRequest
+    ),
+    "newest generation for the active Place must be accepted"
+)
+let preservedRequest = loadReducer.beginLoading(waterBodyID: bodyB.id)
+Check.expect(
+    loadReducer.accept(
+        .preserved,
+        status: statusB,
+        waterBodyID: bodyB.id,
+        requestGeneration: preservedRequest
+    )
+        && loadReducer.state == .preserved(statusB),
+    "cached failure must publish preserved status"
+)
+let unavailableRequest = loadReducer.beginLoading(waterBodyID: bodyB.id)
+Check.expect(
+    loadReducer.accept(
+        .unavailable,
+        status: nil,
+        waterBodyID: bodyB.id,
+        requestGeneration: unavailableRequest
+    )
+        && loadReducer.state == .unavailable(bodyB.id),
+    "uncached failure must publish unavailable status"
+)
+
 print("Hydro fixtures:")
 for (name, experience, style) in [
     ("calm", calm, calmStyle),

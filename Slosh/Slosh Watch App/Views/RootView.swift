@@ -56,6 +56,7 @@ struct RootView: View {
     @State private var realWaterCoordinator = RealWaterAppCoordinator(
         forceFailure: RootView.debugRealWaterForceFailure
     )
+    @State private var realWaterLoadState: RealWaterLoadState = .inactive
     @State private var crownEnergy = EnergyRange.default
 
     /// `simctl launch … -startInPicker YES` opens straight to the picker.
@@ -113,7 +114,8 @@ struct RootView: View {
             ThemePickerView(
                 selectedThemeID: $themeID,
                 selectedPlaceID: $placeID,
-                hapticsEnabled: $hapticsEnabled
+                hapticsEnabled: $hapticsEnabled,
+                realWaterLoadState: realWaterLoadState
             )
         }
         .onAppear {
@@ -138,6 +140,9 @@ struct RootView: View {
             deactivateRealWater()
             model.apply(hydroExperience: nil)
             model.apply(theme: theme)
+            realWaterLoadState = activeWaterBody.map {
+                .loading($0.id)
+            } ?? .inactive
             if scenePhase == .active, !isLuminanceReduced { activateRealWater() }
         }
         .onChange(of: crownEnergy) { _, newValue in
@@ -171,7 +176,8 @@ struct RootView: View {
     private func activateRealWater() {
         realWaterCoordinator.activate(
             waterBody: activeWaterBody,
-            model: model
+            model: model,
+            onLoadState: { realWaterLoadState = $0 }
         )
     }
 

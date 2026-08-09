@@ -143,7 +143,7 @@ Check.expect(WaterBodies.body(id: "monterey-bay") == WaterBodies.montereyBay, "M
 Check.expect(WaterBodies.body(id: "lake-tahoe") == WaterBodies.lakeTahoe, "Lake Tahoe resolves by canonical id")
 Check.expect(WaterBodies.montereyBay.capabilities == [.waterLevel, .waterTemperature, .airPressure], "Monterey publishes reviewed partial NOAA coverage")
 Check.expect(WaterBodies.montereyBay.coverage[.wind] == .unavailable, "Monterey does not promise unavailable wind")
-Check.expect(WaterBodies.lakeTahoe.coverage[.waterLevel] == .observed, "Lake Tahoe publishes observed inland water level")
+Check.expect(WaterBodies.lakeTahoe.coverage[.waterLevel] == .supported, "Lake Tahoe publishes supported inland water level")
 Check.expect(WaterBodies.lakeTahoe.coverage[.wind] == .unavailable, "Lake Tahoe exposes explicit unavailable capabilities")
 Check.expect(WaterBodies.all.allSatisfy { $0.coverage.count == HydroCapability.allCases.count }, "every place publishes complete capability coverage")
 

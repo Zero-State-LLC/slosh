@@ -271,7 +271,7 @@ RW3 keeps the catalog deliberately small and reviewed:
 | Lake Tahoe | USGS NWIS instantaneous values `10337000` | gage height as water level |
 
 Every `WaterBody` exposes a complete map over `HydroCapability`: each capability
-is either `observed` or `unavailable`. This prevents a partial station from being
+is either `supported` or `unavailable`. This prevents a partial station from being
 presented as uniformly instrumented. Monterey wind is unavailable in the
 reviewed latest-observation product and is not requested. Lake Tahoe does not
 claim wind, current, wave, pressure, salinity, or temperature coverage.
@@ -336,6 +336,71 @@ from appearing during the next fetch. Lifecycle cancellation, ten-minute
 per-place throttling, and per-place fallback continue to be owned by
 `LiveHydroCoordinator`.
 
+### Place status, freshness, and provenance presentation
+
+RW3B keeps reviewed catalog capability separate from the latest observation
+result. `WaterBody.coverage` answers whether a reviewed source binding exists;
+`PlaceHydroStatus` answers what the most recent assembled snapshot contains:
+
+```text
+observed    → timely measurement evidence is present
+stale       → measurement evidence remains, but its timestamp cannot drive water
+missing     → the catalog supports the signal, but the latest state has no sample
+unavailable → the catalog has no reviewed source for the signal
+```
+
+`PlaceHydroStatusResolver` is pure and receives `WaterBody`, optional
+`HydroState`, and an explicit reference date. It delegates signal usability to
+`HydroInterpreter`; the UI owns no duplicate age or future-skew threshold.
+Canonical capabilities remain independently represented, while compact watch
+rows group wind speed/direction and current speed/direction without inventing a
+missing component. Wave measurements remain part of `HydroState` and the
+interpreter, but are not catalog capability claims until a reviewed source exists.
+
+The watch picker derives its capability summary from the catalog. The selected
+Place can open a compact status-and-sources surface showing current values,
+freshness, age, unavailable versus missing signals, and measurement provenance.
+The main water view remains free of telemetry.
+
+Friendly source presentation is deterministic and retains the canonical ID:
+
+```text
+noaa.coops.9414290.water_level → NOAA CO-OPS · Station 9414290
+usgs.nwis.10337000.00065       → USGS · Site 10337000
+```
+
+Each measurement detail also shows origin and quality:
+
+```text
+good    → Good
+unknown → Provisional / Unknown (still usable)
+suspect → Suspect · not used
+
+observed  → Observed
+forecast  → Forecast
+predicted → Predicted
+derived   → Derived
+```
+
+The application load state is always scoped to one canonical `WaterBody.id`:
+
+```text
+inactive
+loading(placeID)
+loaded(PlaceHydroStatus)
+preserved(PlaceHydroStatus)
+unavailable(placeID)
+```
+
+Switching Places immediately publishes loading for the new ID and clears the
+old Place's forcing. Cancellation remains the first defense against obsolete
+work; the application coordinator also compares both the captured request
+generation and Place ID before applying either water or presentation state. A
+late completion for Place A therefore cannot overwrite Place B, and an older
+request cannot overwrite a newer activation of the same Place. Preserved cache is labeled
+"Using last observation"; an uncached failure is labeled "Live data
+unavailable" and never exposes a raw provider error to normal UI.
+
 Debug simulator launch arguments accept every curated ID:
 
 ```bash
@@ -344,11 +409,11 @@ Debug simulator launch arguments accept every curated ID:
 -realWater lake-tahoe
 ```
 
-The next slice is **RW3B — Place status, freshness, and provenance presentation**
-so the selection UI can communicate loading, unavailable, stale, and source
-details rather than expressing state only through the water.
-USGS Water Data and NOAA ERDDAP remain future options only where they contribute
-a distinct, reviewed measurement.
+The recommended next slice is **RW3C — catalog expansion and provider coverage
+research**, using the status model to evaluate each proposed addition before the
+catalog grows. If the three reviewed Places are sufficient for the product, move
+instead to RW4's iPhone geographic-discovery foundation. USGS Water Data and NOAA
+ERDDAP remain options only where they contribute a distinct, reviewed measurement.
 
 ## Explicit non-goals of the current Real Water slices
 
@@ -357,7 +422,7 @@ a distinct, reviewed measurement.
 - forecasting;
 - persistent caching or databases;
 - historical playback;
-- map or general Places UI;
+- map UI or automatic geographic discovery;
 - server infrastructure;
 - CFD simulation.
 

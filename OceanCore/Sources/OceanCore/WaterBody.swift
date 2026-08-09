@@ -37,13 +37,13 @@ public struct WaterBody: Identifiable, Sendable, Equatable {
     /// is product information, not an invitation to fabricate a substitute.
     public var coverage: [HydroCapability: HydroCoverageAvailability] {
         Dictionary(uniqueKeysWithValues: HydroCapability.allCases.map { capability in
-            (capability, capabilities.contains(capability) ? .observed : .unavailable)
+            (capability, capabilities.contains(capability) ? .supported : .unavailable)
         })
     }
 }
 
 public enum HydroCoverageAvailability: String, Sendable, Equatable {
-    case observed
+    case supported
     case unavailable
 }
 

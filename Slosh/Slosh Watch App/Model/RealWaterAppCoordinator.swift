@@ -19,6 +19,9 @@ final class RealWaterAppCoordinator {
     )
     private let coordinator: LiveHydroCoordinator
     private var task: Task<Void, Never>?
+    private var activeWaterBodyID: WaterBody.ID?
+    private let statusResolver = PlaceHydroStatusResolver()
+    private var loadReducer = RealWaterLoadReducer()
 
     init(forceFailure: Bool = false) {
         if forceFailure {
@@ -28,26 +31,67 @@ final class RealWaterAppCoordinator {
         }
     }
 
-    func activate(waterBody: WaterBody?, model: OceanModel) {
+    func activate(
+        waterBody: WaterBody?,
+        model: OceanModel,
+        onLoadState: @escaping (RealWaterLoadState) -> Void
+    ) {
         guard let waterBody else { return }
         task?.cancel()
+        activeWaterBodyID = waterBody.id
+        let requestGeneration = loadReducer.beginLoading(waterBodyID: waterBody.id)
+        onLoadState(loadReducer.state)
         task = Task {
+            let referenceDate = Date()
             let outcome = await coordinator.refresh(
                 waterBody: waterBody,
-                referenceDate: Date()
+                referenceDate: referenceDate
             )
-            guard !Task.isCancelled else { return }
+            // Cancellation is cooperative. The ID guard is the application-level
+            // proof that an older Place can never repaint a newer selection.
+            guard !Task.isCancelled, activeWaterBodyID == waterBody.id else { return }
             switch outcome {
             case let .updated(state, experience):
+                let status = statusResolver.resolve(
+                    waterBody: waterBody,
+                    state: state,
+                    referenceDate: referenceDate
+                )
+                guard loadReducer.accept(
+                    .updated,
+                    status: status,
+                    waterBodyID: waterBody.id,
+                    requestGeneration: requestGeneration
+                ) else { return }
                 model.apply(hydroExperience: experience)
+                onLoadState(loadReducer.state)
                 printLiveSummary(state: state, experience: experience, disposition: "updated")
             case let .preserved(state, experience):
+                let status = statusResolver.resolve(
+                    waterBody: waterBody,
+                    state: state,
+                    referenceDate: referenceDate
+                )
+                guard loadReducer.accept(
+                    .preserved,
+                    status: status,
+                    waterBodyID: waterBody.id,
+                    requestGeneration: requestGeneration
+                ) else { return }
                 model.apply(hydroExperience: experience)
+                onLoadState(loadReducer.state)
                 printLiveSummary(state: state, experience: experience, disposition: "preserved")
             case .unavailable:
                 // No prior observation means there is nothing environmental to
                 // apply. The authored Calm ocean has kept rendering throughout.
-                Self.logger.notice("RW3A real-water unavailable; authored ocean preserved")
+                guard loadReducer.accept(
+                    .unavailable,
+                    status: nil,
+                    waterBodyID: waterBody.id,
+                    requestGeneration: requestGeneration
+                ) else { return }
+                onLoadState(loadReducer.state)
+                Self.logger.notice("RW3B real-water unavailable; authored ocean preserved")
             }
         }
     }
@@ -55,6 +99,8 @@ final class RealWaterAppCoordinator {
     func deactivate() {
         task?.cancel()
         task = nil
+        activeWaterBodyID = nil
+        loadReducer.deactivate()
     }
 
     private func printLiveSummary(
@@ -72,7 +118,7 @@ final class RealWaterAppCoordinator {
             state.pressure.map { "pressure=\($0.value)hPa" },
             state.salinity.map { "salinity=\($0.value)PSU" },
         ].compactMap { $0 }.joined(separator: ",")
-        let message = "RW3A real-water \(disposition) observedAt=\(state.observedAt) "
+        let message = "RW3B real-water \(disposition) observedAt=\(state.observedAt) "
             + "fields=[\(fields)] freshness=\(experience.forcing.freshness.rawValue) "
             + "forcing=\(experience.forcing) modifiers=\(experience.themeModifiers)"
         Self.logger.notice("\(message, privacy: .public)")

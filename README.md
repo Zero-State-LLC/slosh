@@ -43,6 +43,8 @@ The watch picker can select those curated Places; NOAA CO-OPS and USGS NWIS
 observations stay behind provider-independent Hydro contracts. This is not
 general geographic discovery; see
 [docs/REAL_WATER.md](docs/REAL_WATER.md) for coverage and provenance rules.
+The watch picker exposes compact freshness and exact source provenance while
+keeping the full-screen water experience free of telemetry.
 
 ## Status
 

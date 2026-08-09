@@ -197,6 +197,21 @@ public struct HydroInterpreter: Sendable {
     ) -> Bool {
         guard isStructurallyUsable(measurement, expectedUnit: expectedUnit),
               let measurement else { return false }
+        return isSignalTimestampUsable(
+            measurement,
+            stateObservedAt: stateObservedAt,
+            referenceDate: referenceDate
+        )
+    }
+
+    /// The shared temporal portion of signal usability. Presentation uses this
+    /// to distinguish stale evidence from a timely-but-suspect observation while
+    /// the complete forcing gate remains `isSignalUsable`.
+    public func isSignalTimestampUsable(
+        _ measurement: HydroMeasurement,
+        stateObservedAt: Date,
+        referenceDate: Date
+    ) -> Bool {
         let observedAt = measurement.observedAt ?? stateObservedAt
         guard observedAt <= referenceDate.addingTimeInterval(
             FreshnessThresholds.maxFutureClockSkew

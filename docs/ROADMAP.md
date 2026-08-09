@@ -192,14 +192,22 @@ relevant product foundation is sound.
 - **RW3 complete:** San Francisco Bay, Monterey Bay, and Lake Tahoe form a
   deliberately small reviewed catalog spanning NOAA CO-OPS coastal observations
   and USGS NWIS inland gage height.
-- Every place publishes explicit `observed` or `unavailable` status for every
+- Every place publishes explicit `supported` or `unavailable` status for every
   Hydro capability instead of promising uniform coverage.
 - **RW3A complete:** provider routes compose by opaque namespace, tolerate
   partial failure, and merge successful states deterministically. The watch
   picker persists deliberate selection of any curated Place and clears prior
   forcing before switching.
-- **Next:** RW3B — Place status, freshness, and provenance presentation.
-  Automatic discovery remains out of scope.
+- **RW3B complete:** provider-independent Place status now distinguishes reviewed
+  capability from observed, stale, missing, and unavailable current state. The
+  watch exposes compact freshness, age, quality, origin, and exact source
+  provenance without covering the water, identifies preserved versus unavailable
+  fetch outcomes, and rejects late async results from a previously selected
+  Place.
+- **Next:** RW3C — catalog expansion and provider coverage research. Validate the
+  status model with the current three-Place product before adding automatic
+  discovery. If those three Places are sufficient, proceed instead to RW4's
+  iPhone geographic-discovery foundation.
 
 ### RW4 — iPhone geographic discovery
 
