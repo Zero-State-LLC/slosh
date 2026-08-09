@@ -59,6 +59,7 @@ func measurement(
     _ unit: HydroUnit,
     quality: HydroQuality = .good,
     convention: HydroDirectionConvention? = nil,
+    observedAt: Date? = nil,
     id: String = "check"
 ) -> HydroMeasurement {
     HydroMeasurement(
@@ -67,6 +68,7 @@ func measurement(
         origin: .observed,
         quality: quality,
         sourceID: id,
+        observedAt: observedAt,
         directionConvention: convention
     )
 }
@@ -196,6 +198,192 @@ let staleBoundary = state(
 Check.expect(
     interpreter.interpret(staleBoundary, referenceDate: referenceDate).forcing.freshness == .stale,
     "past the recent boundary must be stale"
+)
+
+print("Per-signal freshness")
+let minutes: (Double) -> Date = { referenceDate.addingTimeInterval(-$0 * 60) }
+let mixedFresh = HydroState(
+    observedAt: minutes(20),
+    retrievedAt: referenceDate,
+    waterLevel: measurement(1.2, .meters, observedAt: minutes(5)),
+    currentSpeed: measurement(1.0, .metersPerSecond, observedAt: minutes(20)),
+    currentDirection: measurement(
+        240, .degreesTrue, convention: .toward, observedAt: minutes(20)
+    ),
+    windSpeed: measurement(12, .metersPerSecond, observedAt: minutes(8)),
+    windDirection: measurement(
+        210, .degreesTrue, convention: .from, observedAt: minutes(8)
+    ),
+    pressure: measurement(990, .hectopascals, observedAt: minutes(10))
+)
+let mixedFreshExperience = interpreter.interpret(mixedFresh, referenceDate: referenceDate)
+Check.expect(
+    mixedFreshExperience.forcing.flowStrength > 0
+        && mixedFreshExperience.forcing.flowDirection != nil
+        && mixedFreshExperience.forcing.windStrength > 0
+        && mixedFreshExperience.forcing.windDirection != nil,
+    "mixed fresh fixture keeps every signal usable"
+)
+
+let staleCurrent = HydroState(
+    observedAt: minutes(90),
+    retrievedAt: referenceDate,
+    waterLevel: measurement(1.2, .meters, observedAt: minutes(5)),
+    currentSpeed: measurement(2.5, .metersPerSecond, observedAt: minutes(90)),
+    currentDirection: measurement(
+        240, .degreesTrue, convention: .toward, observedAt: minutes(90)
+    ),
+    waveHeight: measurement(2.5, .meters, observedAt: minutes(6)),
+    windSpeed: measurement(10, .metersPerSecond, observedAt: minutes(8))
+)
+let staleCurrentExperience = interpreter.interpret(staleCurrent, referenceDate: referenceDate)
+Check.equal(staleCurrentExperience.forcing.flowStrength, 0, "stale current speed must be ignored")
+Check.expect(
+    staleCurrentExperience.forcing.flowDirection == nil,
+    "stale current direction must be ignored"
+)
+Check.expect(
+    staleCurrentExperience.forcing.waveAmplitude > 0
+        && staleCurrentExperience.forcing.windStrength > 0,
+    "mixed stale state still uses fresh wave and wind signals"
+)
+Check.expect(
+    staleCurrentExperience.forcing.freshness == .stale,
+    "state freshness remains the conservative snapshot status"
+)
+Check.expect(
+    staleCurrent.currentSpeed?.value == 2.5
+        && staleCurrent.currentDirection?.value == 240,
+    "ignored stale measurements remain preserved in HydroState"
+)
+
+let staleWaveWithFreshWind = HydroState(
+    observedAt: minutes(90),
+    retrievedAt: referenceDate,
+    waveHeight: measurement(5, .meters, observedAt: minutes(90)),
+    wavePeriod: measurement(2, .seconds, observedAt: minutes(90)),
+    windSpeed: measurement(10, .metersPerSecond, observedAt: minutes(8))
+)
+let staleWaveExperience = interpreter.interpret(
+    staleWaveWithFreshWind, referenceDate: referenceDate
+)
+Check.equal(staleWaveExperience.forcing.waveAmplitude, 0, "stale wave height must be ignored")
+Check.equal(staleWaveExperience.forcing.waveRate, 0, "stale wave period must be ignored")
+Check.expect(
+    staleWaveExperience.forcing.windStrength > 0,
+    "fresh wind remains usable beside stale wave measurements"
+)
+
+let freshWindOnly = HydroState(
+    observedAt: minutes(8),
+    retrievedAt: referenceDate,
+    windSpeed: measurement(15, .metersPerSecond, observedAt: minutes(8))
+)
+let freshWindWithStalePressure = HydroState(
+    observedAt: minutes(90),
+    retrievedAt: referenceDate,
+    windSpeed: freshWindOnly.windSpeed,
+    pressure: measurement(968, .hectopascals, observedAt: minutes(90))
+)
+let freshWindOnlyExperience = interpreter.interpret(freshWindOnly, referenceDate: referenceDate)
+let stalePressureExperience = interpreter.interpret(
+    freshWindWithStalePressure, referenceDate: referenceDate
+)
+Check.expect(stalePressureExperience.forcing.windStrength > 0, "fresh wind drives turbulence")
+Check.equal(
+    stalePressureExperience.forcing.turbulence,
+    freshWindOnlyExperience.forcing.turbulence,
+    "stale pressure does not affect turbulence"
+)
+Check.equal(
+    stalePressureExperience.themeModifiers.causticStrength,
+    freshWindOnlyExperience.themeModifiers.causticStrength,
+    "stale pressure does not affect the secondary modifier"
+)
+
+let staleEverything = HydroState(
+    observedAt: minutes(95),
+    retrievedAt: referenceDate,
+    waterLevel: measurement(3, .meters, observedAt: minutes(95)),
+    waterTemperature: measurement(35, .celsius, observedAt: minutes(94)),
+    currentSpeed: measurement(2.5, .metersPerSecond, observedAt: minutes(93)),
+    currentDirection: measurement(
+        90, .degreesTrue, convention: .toward, observedAt: minutes(93)
+    ),
+    waveHeight: measurement(5, .meters, observedAt: minutes(92)),
+    wavePeriod: measurement(2, .seconds, observedAt: minutes(92)),
+    windSpeed: measurement(25, .metersPerSecond, observedAt: minutes(91)),
+    windDirection: measurement(
+        180, .degreesTrue, convention: .from, observedAt: minutes(91)
+    ),
+    pressure: measurement(968, .hectopascals, observedAt: minutes(90)),
+    salinity: measurement(52, .practicalSalinityUnits, observedAt: minutes(90))
+)
+let staleEverythingExperience = interpreter.interpret(staleEverything, referenceDate: referenceDate)
+Check.equal(staleEverythingExperience.forcing.energy, 0.08, "stale everything retains neutral energy baseline")
+Check.equal(staleEverythingExperience.forcing.chop, 0, "stale wave height and period must be ignored")
+Check.equal(staleEverythingExperience.forcing.turbulence, 0, "stale wind and current must be ignored")
+Check.equal(staleEverythingExperience.forcing.flowStrength, 0, "stale current contributes no strength")
+Check.equal(staleEverythingExperience.forcing.waveAmplitude, 0, "stale wave height contributes no amplitude")
+Check.equal(staleEverythingExperience.forcing.windStrength, 0, "stale wind contributes no strength")
+Check.equal(
+    staleEverythingExperience.themeModifiers.causticStrength, 0,
+    "stale secondary metrics must not affect modifiers"
+)
+
+let futurePoisoned = HydroState(
+    observedAt: minutes(10),
+    retrievedAt: referenceDate,
+    waveHeight: measurement(2, .meters, observedAt: minutes(5)),
+    windSpeed: measurement(
+        25, .metersPerSecond,
+        observedAt: referenceDate.addingTimeInterval(6 * 60)
+    )
+)
+let futurePoisonedExperience = interpreter.interpret(futurePoisoned, referenceDate: referenceDate)
+Check.expect(futurePoisonedExperience.forcing.waveAmplitude > 0, "fresh peer signal survives future poison")
+Check.equal(futurePoisonedExperience.forcing.windStrength, 0, "future-poisoned individual signal is ignored")
+Check.expect(
+    futurePoisonedExperience.forcing.freshness == .live,
+    "one future-poisoned signal does not make a valid state unavailable"
+)
+
+let timestampOverride = HydroState(
+    observedAt: minutes(90),
+    retrievedAt: referenceDate,
+    waveHeight: measurement(2, .meters, observedAt: minutes(5))
+)
+Check.expect(
+    interpreter.interpret(timestampOverride, referenceDate: referenceDate).forcing.waveAmplitude > 0,
+    "per-measurement timestamp overrides stale state timestamp"
+)
+let timestampFallback = HydroState(
+    observedAt: minutes(61),
+    retrievedAt: referenceDate,
+    waveHeight: measurement(2, .meters)
+)
+Check.equal(
+    interpreter.interpret(timestampFallback, referenceDate: referenceDate).forcing.waveAmplitude,
+    0,
+    "missing measurement timestamp falls back to stale state timestamp"
+)
+Check.expect(
+    interpreter.isSignalUsable(
+        measurement(1, .meters, quality: .unknown, observedAt: minutes(60)),
+        expectedUnit: .meters,
+        stateObservedAt: referenceDate,
+        referenceDate: referenceDate
+    ),
+    "unknown quality at exactly sixty minutes remains usable"
+)
+Check.expect(
+    !interpreter.isSignalUsable(
+        measurement(1, .seconds, observedAt: minutes(5)),
+        expectedUnit: .meters,
+        stateObservedAt: referenceDate,
+        referenceDate: referenceDate
+    ),
+    "signal usability requires the expected unit"
 )
 
 func qualityState(

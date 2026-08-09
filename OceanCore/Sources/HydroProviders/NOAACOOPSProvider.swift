@@ -6,6 +6,8 @@ import FoundationNetworking
 #endif
 
 public enum NOAAHydroAggregator {
+    /// The oldest valid product timestamp is the conservative snapshot summary;
+    /// using the newest would make older included evidence appear fresher.
     public static func state(
         samples: [NOAAProductSample],
         retrievedAt: Date

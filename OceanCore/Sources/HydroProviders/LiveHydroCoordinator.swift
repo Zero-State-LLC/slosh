@@ -7,14 +7,24 @@ public enum HydroRefreshOutcome: Sendable, Equatable {
     case unavailable
 }
 
-/// Application-facing refresh policy. It owns only an in-memory last-known valid
-/// state and never couples network cadence to simulation or render cadence.
+/// In-memory refresh state for one canonical `WaterBody.id`.
+private struct WaterBodyRefreshRecord: Sendable, Equatable {
+    var lastAttemptAt: Date?
+    var lastValidState: HydroState?
+
+    init(lastAttemptAt: Date? = nil, lastValidState: HydroState? = nil) {
+        self.lastAttemptAt = lastAttemptAt
+        self.lastValidState = lastValidState
+    }
+}
+
+/// Application-facing refresh policy. Throttle and fallback state are isolated
+/// by canonical water-body ID and never couple network cadence to render cadence.
 public actor LiveHydroCoordinator {
     public static let minimumRefreshInterval: TimeInterval = 10 * 60
 
     private let provider: any HydroStateProvider
-    private var lastAttemptAt: Date?
-    private var lastValidState: HydroState?
+    private var records: [WaterBody.ID: WaterBodyRefreshRecord] = [:]
 
     public init(provider: any HydroStateProvider) {
         self.provider = provider
@@ -24,15 +34,20 @@ public actor LiveHydroCoordinator {
         waterBody: WaterBody,
         referenceDate: Date
     ) async -> HydroRefreshOutcome {
-        if let lastAttemptAt,
+        let waterBodyID = waterBody.id
+        var record = records[waterBodyID] ?? WaterBodyRefreshRecord()
+        if let lastAttemptAt = record.lastAttemptAt,
            referenceDate.timeIntervalSince(lastAttemptAt) < Self.minimumRefreshInterval {
-            return preservedOrUnavailable(referenceDate: referenceDate)
+            return preservedOrUnavailable(for: waterBodyID, referenceDate: referenceDate)
         }
-        lastAttemptAt = referenceDate
+        record.lastAttemptAt = referenceDate
+        records[waterBodyID] = record
 
         do {
             let state = try await provider.fetch(waterBody)
-            lastValidState = state
+            record = records[waterBodyID] ?? WaterBodyRefreshRecord()
+            record.lastValidState = state
+            records[waterBodyID] = record
             return .updated(
                 state: state,
                 experience: HydroInterpreter().interpret(state, referenceDate: referenceDate)
@@ -41,19 +56,30 @@ public actor LiveHydroCoordinator {
             // Backgrounding or reduced luminance cancels the in-flight request.
             // A canceled request did not refresh anything and must not suppress
             // the next foreground activation for the normal ten-minute window.
-            if lastAttemptAt == referenceDate { lastAttemptAt = nil }
-            return preservedOrUnavailable(referenceDate: referenceDate)
+            record = records[waterBodyID] ?? WaterBodyRefreshRecord()
+            if record.lastAttemptAt == referenceDate {
+                record.lastAttemptAt = nil
+                records[waterBodyID] = record
+            }
+            return preservedOrUnavailable(for: waterBodyID, referenceDate: referenceDate)
         } catch {
-            return preservedOrUnavailable(referenceDate: referenceDate)
+            return preservedOrUnavailable(for: waterBodyID, referenceDate: referenceDate)
         }
     }
 
-    public func cachedState() -> HydroState? {
-        lastValidState
+    public func cachedState(for waterBodyID: WaterBody.ID) -> HydroState? {
+        records[waterBodyID]?.lastValidState
     }
 
-    private func preservedOrUnavailable(referenceDate: Date) -> HydroRefreshOutcome {
-        guard let state = lastValidState else { return .unavailable }
+    public func cachedState(for waterBody: WaterBody) -> HydroState? {
+        cachedState(for: waterBody.id)
+    }
+
+    private func preservedOrUnavailable(
+        for waterBodyID: WaterBody.ID,
+        referenceDate: Date
+    ) -> HydroRefreshOutcome {
+        guard let state = records[waterBodyID]?.lastValidState else { return .unavailable }
         return .preserved(
             state: state,
             experience: HydroInterpreter().interpret(state, referenceDate: referenceDate)

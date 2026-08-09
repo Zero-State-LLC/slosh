@@ -1,7 +1,9 @@
 import Foundation
 
-/// Provider-independent state for one body of water at one observation time.
-/// Missing measurements remain `nil`; zero is always a real measured value.
+/// Provider-independent snapshot assembled for one body of water. Measurements
+/// may have different source observation timestamps. `observedAt` is a
+/// conservative summary timestamp, while each measurement preserves its actual
+/// product timestamp when available. Missing values remain `nil`; zero is real.
 public struct HydroState: Sendable, Equatable {
     public var observedAt: Date
     public var retrievedAt: Date

@@ -6,21 +6,47 @@ public struct HydroInterpreter: Sendable {
     public enum FreshnessThresholds {
         public static let live: TimeInterval = 15 * 60
         public static let recent: TimeInterval = 60 * 60
+        /// Dynamic signals older than this remain evidence in `HydroState` but
+        /// cannot affect perceptual forcing.
+        public static let signalUsable: TimeInterval = recent
         public static let maxFutureClockSkew: TimeInterval = 5 * 60
     }
 
     public init() {}
 
     public func interpret(_ state: HydroState, referenceDate: Date) -> HydroExperience {
-        let wave = normalized(state.waveHeight, unit: .meters, maximum: 5)
-        let current = normalized(state.currentSpeed, unit: .metersPerSecond, maximum: 2.5)
-        let wind = normalized(state.windSpeed, unit: .metersPerSecond, maximum: 25)
-        let period = waveRate(state.wavePeriod)
+        let wave = normalized(
+            state.waveHeight, unit: .meters, maximum: 5,
+            stateObservedAt: state.observedAt, referenceDate: referenceDate
+        )
+        let current = normalized(
+            state.currentSpeed, unit: .metersPerSecond, maximum: 2.5,
+            stateObservedAt: state.observedAt, referenceDate: referenceDate
+        )
+        let wind = normalized(
+            state.windSpeed, unit: .metersPerSecond, maximum: 25,
+            stateObservedAt: state.observedAt, referenceDate: referenceDate
+        )
+        let period = waveRate(
+            state.wavePeriod, stateObservedAt: state.observedAt, referenceDate: referenceDate
+        )
 
-        let level = normalizedMagnitude(state.waterLevel, unit: .meters, maximum: 3)
-        let temperature = normalizedDeviation(state.waterTemperature, unit: .celsius, center: 15, span: 20)
-        let pressure = normalizedDeviation(state.pressure, unit: .hectopascals, center: 1013.25, span: 45)
-        let salinity = normalizedDeviation(state.salinity, unit: .practicalSalinityUnits, center: 32, span: 20)
+        let level = normalizedMagnitude(
+            state.waterLevel, unit: .meters, maximum: 3,
+            stateObservedAt: state.observedAt, referenceDate: referenceDate
+        )
+        let temperature = normalizedDeviation(
+            state.waterTemperature, unit: .celsius, center: 15, span: 20,
+            stateObservedAt: state.observedAt, referenceDate: referenceDate
+        )
+        let pressure = normalizedDeviation(
+            state.pressure, unit: .hectopascals, center: 1013.25, span: 45,
+            stateObservedAt: state.observedAt, referenceDate: referenceDate
+        )
+        let salinity = normalizedDeviation(
+            state.salinity, unit: .practicalSalinityUnits, center: 32, span: 20,
+            stateObservedAt: state.observedAt, referenceDate: referenceDate
+        )
         let secondary = clamp((level + temperature + pressure + salinity) * 0.025)
 
         let waveValue = wave ?? 0
@@ -38,12 +64,20 @@ public struct HydroInterpreter: Sendable {
             energy: energy,
             chop: chop,
             turbulence: turbulence,
-            flowDirection: direction(state.currentDirection),
+            flowDirection: direction(
+                state.currentDirection,
+                stateObservedAt: state.observedAt,
+                referenceDate: referenceDate
+            ),
             flowStrength: currentValue,
             waveAmplitude: waveValue,
             waveRate: periodValue,
             foamPotential: foam,
-            windDirection: direction(state.windDirection),
+            windDirection: direction(
+                state.windDirection,
+                stateObservedAt: state.observedAt,
+                referenceDate: referenceDate
+            ),
             windStrength: windValue,
             freshness: freshness(of: state, referenceDate: referenceDate)
         )
@@ -70,43 +104,65 @@ public struct HydroInterpreter: Sendable {
         return .stale
     }
 
-    private func normalized(_ measurement: HydroMeasurement?, unit: HydroUnit, maximum: Double) -> Double? {
-        guard isUsable(measurement, unit: unit) else { return nil }
+    private func normalized(
+        _ measurement: HydroMeasurement?,
+        unit: HydroUnit,
+        maximum: Double,
+        stateObservedAt: Date,
+        referenceDate: Date
+    ) -> Double? {
+        guard isSignalUsable(
+            measurement, expectedUnit: unit,
+            stateObservedAt: stateObservedAt, referenceDate: referenceDate
+        ) else { return nil }
         guard let measurement else { return nil }
         return clamp(measurement.value / maximum)
     }
 
     private func normalizedMagnitude(
-        _ measurement: HydroMeasurement?, unit: HydroUnit, maximum: Double
+        _ measurement: HydroMeasurement?, unit: HydroUnit, maximum: Double,
+        stateObservedAt: Date, referenceDate: Date
     ) -> Double {
-        guard isUsable(measurement, unit: unit), let measurement else { return 0 }
+        guard isSignalUsable(
+            measurement, expectedUnit: unit,
+            stateObservedAt: stateObservedAt, referenceDate: referenceDate
+        ), let measurement else { return 0 }
         return clamp(abs(measurement.value) / maximum)
     }
 
     private func normalizedDeviation(
-        _ measurement: HydroMeasurement?, unit: HydroUnit, center: Double, span: Double
+        _ measurement: HydroMeasurement?, unit: HydroUnit, center: Double, span: Double,
+        stateObservedAt: Date, referenceDate: Date
     ) -> Double {
-        guard isUsable(measurement, unit: unit), let measurement else { return 0 }
+        guard isSignalUsable(
+            measurement, expectedUnit: unit,
+            stateObservedAt: stateObservedAt, referenceDate: referenceDate
+        ), let measurement else { return 0 }
         return clamp(abs(measurement.value - center) / span)
     }
 
-    private func waveRate(_ measurement: HydroMeasurement?) -> Double? {
+    private func waveRate(
+        _ measurement: HydroMeasurement?, stateObservedAt: Date, referenceDate: Date
+    ) -> Double? {
         guard let measurement,
-              measurement.unit == .seconds,
-              measurement.quality != .suspect,
-              measurement.value.isFinite,
+              isSignalUsable(
+                measurement, expectedUnit: .seconds,
+                stateObservedAt: stateObservedAt, referenceDate: referenceDate
+              ),
               measurement.value > 0 else { return nil }
         // Short periods read as faster water. Twenty seconds and above settle at
         // zero; two seconds and below reach the normalized ceiling.
         return clamp((20 - measurement.value) / 18)
     }
 
-    private func direction(_ measurement: HydroMeasurement?) -> Double? {
+    private func direction(
+        _ measurement: HydroMeasurement?, stateObservedAt: Date, referenceDate: Date
+    ) -> Double? {
         guard let measurement,
-              measurement.unit == .degreesTrue,
-              measurement.quality != .suspect,
-              measurement.value.isFinite,
-              let convention = measurement.directionConvention else { return nil }
+              isSignalUsable(
+                measurement, expectedUnit: .degreesTrue,
+                stateObservedAt: stateObservedAt, referenceDate: referenceDate
+              ), let convention = measurement.directionConvention else { return nil }
         let towardDegrees = measurement.value + (convention == .from ? 180 : 0)
         let degrees = towardDegrees.truncatingRemainder(dividingBy: 360)
         let positive = degrees < 0 ? degrees + 360 : degrees
@@ -127,16 +183,36 @@ public struct HydroInterpreter: Sendable {
             (state.salinity, .practicalSalinityUnits),
         ]
         return expected.contains { measurement, unit in
-            isUsable(measurement, unit: unit)
+            isStructurallyUsable(measurement, expectedUnit: unit)
         }
     }
 
-    private func isUsable(_ measurement: HydroMeasurement?, unit: HydroUnit) -> Bool {
+    /// One authoritative dynamic-signal gate. Missing per-product timestamps use
+    /// the snapshot summary; raw measurements are never removed or rewritten.
+    public func isSignalUsable(
+        _ measurement: HydroMeasurement?,
+        expectedUnit: HydroUnit,
+        stateObservedAt: Date,
+        referenceDate: Date
+    ) -> Bool {
+        guard isStructurallyUsable(measurement, expectedUnit: expectedUnit),
+              let measurement else { return false }
+        let observedAt = measurement.observedAt ?? stateObservedAt
+        guard observedAt <= referenceDate.addingTimeInterval(
+            FreshnessThresholds.maxFutureClockSkew
+        ) else { return false }
+        return referenceDate.timeIntervalSince(observedAt)
+            <= FreshnessThresholds.signalUsable
+    }
+
+    private func isStructurallyUsable(
+        _ measurement: HydroMeasurement?, expectedUnit: HydroUnit
+    ) -> Bool {
         guard let measurement,
-              measurement.unit == unit,
+              measurement.unit == expectedUnit,
               measurement.quality != .suspect,
               measurement.value.isFinite else { return false }
-        if unit == .degreesTrue { return measurement.directionConvention != nil }
+        if expectedUnit == .degreesTrue { return measurement.directionConvention != nil }
         return true
     }
 

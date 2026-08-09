@@ -36,6 +36,7 @@ private actor SequencedProvider: HydroStateProvider {
 
     private var results: [Result]
     private(set) var fetchCount = 0
+    private(set) var fetchedWaterBodyIDs: [WaterBody.ID] = []
 
     init(_ results: [Result]) {
         self.results = results
@@ -43,6 +44,7 @@ private actor SequencedProvider: HydroStateProvider {
 
     func fetch(_ waterBody: WaterBody) async throws -> HydroState {
         fetchCount += 1
+        fetchedWaterBodyIDs.append(waterBody.id)
         guard !results.isEmpty else { throw NOAAProviderError.noUsableMeasurements }
         switch results.removeFirst() {
         case let .success(state): return state
@@ -51,25 +53,48 @@ private actor SequencedProvider: HydroStateProvider {
     }
 
     func count() -> Int { fetchCount }
+    func fetchedIDs() -> [WaterBody.ID] { fetchedWaterBodyIDs }
 }
 
 actor CancellationThenSuccessProvider: HydroStateProvider {
-    private let state: HydroState
+    private let canceledWaterBodyID: WaterBody.ID
+    private let states: [WaterBody.ID: HydroState]
     private(set) var fetchCount = 0
+    private var canceledOnce = false
+    private(set) var fetchedWaterBodyIDs: [WaterBody.ID] = []
 
-    init(state: HydroState) {
-        self.state = state
+    init(canceledWaterBodyID: WaterBody.ID, states: [WaterBody.ID: HydroState]) {
+        self.canceledWaterBodyID = canceledWaterBodyID
+        self.states = states
     }
 
     func fetch(_ waterBody: WaterBody) async throws -> HydroState {
         fetchCount += 1
-        if fetchCount == 1 {
+        fetchedWaterBodyIDs.append(waterBody.id)
+        if waterBody.id == canceledWaterBodyID, !canceledOnce {
+            canceledOnce = true
             try await Task.sleep(nanoseconds: 10_000_000_000)
+        }
+        guard let state = states[waterBody.id] else {
+            throw NOAAProviderError.noUsableMeasurements
         }
         return state
     }
 
     func count() -> Int { fetchCount }
+    func fetchedIDs() -> [WaterBody.ID] { fetchedWaterBodyIDs }
+}
+
+private func syntheticWaterBody(id: String) -> WaterBody {
+    WaterBody(
+        id: id,
+        name: id,
+        region: "Deterministic test",
+        latitude: 0,
+        longitude: 0,
+        kind: .bay,
+        sourceBindings: []
+    )
 }
 
 print("WaterBody and request contract")
@@ -211,37 +236,96 @@ let experience = HydroInterpreter().interpret(state, referenceDate: retrievedAt)
 Check.expect(experience.forcing.flowDirection != nil, "aggregated current reaches interpreted flow direction")
 Check.expect(experience.forcing.windDirection != nil, "aggregated wind reaches interpreted wind direction")
 
-private let successProvider = SequencedProvider([.success(state), .failure])
-let coordinator = LiveHydroCoordinator(provider: successProvider)
-let first = await coordinator.refresh(waterBody: bay, referenceDate: retrievedAt)
-if case .updated = first { Check.expect(true, "successful refresh updates live state") }
-else { Check.expect(false, "successful refresh updates live state") }
-let throttled = await coordinator.refresh(waterBody: bay, referenceDate: retrievedAt.addingTimeInterval(60))
-if case .preserved = throttled { Check.expect(true, "refresh inside ten minutes preserves cached state") }
-else { Check.expect(false, "refresh inside ten minutes preserves cached state") }
-let fetchCount = await successProvider.count()
-Check.expect(fetchCount == 1, "refresh policy does not poll inside ten minutes")
-let failedAfterWindow = await coordinator.refresh(
-    waterBody: bay,
-    referenceDate: retrievedAt.addingTimeInterval(LiveHydroCoordinator.minimumRefreshInterval)
+let bayA = syntheticWaterBody(id: "test-bay-a")
+let bayB = syntheticWaterBody(id: "test-bay-b")
+var stateA = state
+stateA.waterLevel?.sourceID = "test-bay-a.level"
+var stateB = state
+stateB.waterLevel?.sourceID = "test-bay-b.level"
+
+private let provenanceProvider = SequencedProvider([
+    .success(stateA),
+    .failure,
+    .success(stateB),
+    .failure,
+])
+let coordinator = LiveHydroCoordinator(provider: provenanceProvider)
+let firstA = await coordinator.refresh(waterBody: bayA, referenceDate: retrievedAt)
+if case let .updated(updatedState, _) = firstA {
+    Check.expect(updatedState == stateA, "fetch A updates A")
+} else { Check.expect(false, "fetch A updates A") }
+
+let throttledA = await coordinator.refresh(
+    waterBody: bayA,
+    referenceDate: retrievedAt.addingTimeInterval(2 * 60)
 )
-if case .preserved = failedAfterWindow { Check.expect(true, "network failure preserves last valid state") }
-else { Check.expect(false, "network failure preserves last valid state") }
+if case let .preserved(preservedState, _) = throttledA {
+    Check.expect(preservedState == stateA, "fetch A inside interval preserves A")
+} else { Check.expect(false, "fetch A inside interval preserves A") }
+
+let failedB = await coordinator.refresh(
+    waterBody: bayB,
+    referenceDate: retrievedAt.addingTimeInterval(2 * 60)
+)
+Check.expect(failedB == .unavailable, "B failure without B cache is unavailable")
+let provenanceFetchedIDs = await provenanceProvider.fetchedIDs()
+Check.expect(
+    provenanceFetchedIDs == [bayA.id, bayB.id],
+    "A throttle never suppresses B provider fetch"
+)
+let cachedAAfterBFailure = await coordinator.cachedState(for: bayA)
+Check.expect(
+    cachedAAfterBFailure == stateA,
+    "A cache remains intact after B failure"
+)
+let cachedBAfterFailure = await coordinator.cachedState(for: bayB.id)
+Check.expect(
+    cachedBAfterFailure == nil,
+    "B cannot reuse A cached state"
+)
+
+let successfulB = await coordinator.refresh(
+    waterBody: bayB,
+    referenceDate: retrievedAt.addingTimeInterval(12 * 60)
+)
+if case let .updated(updatedState, _) = successfulB {
+    Check.expect(updatedState == stateB, "B later succeeds into an independent cache")
+} else { Check.expect(false, "B later succeeds into an independent cache") }
+
+let failedALater = await coordinator.refresh(
+    waterBody: bayA,
+    referenceDate: retrievedAt.addingTimeInterval(12 * 60)
+)
+if case let .preserved(preservedState, _) = failedALater {
+    Check.expect(preservedState == stateA, "A failure preserves A rather than B")
+} else { Check.expect(false, "A failure preserves A rather than B") }
+let finalCachedA = await coordinator.cachedState(for: bayA)
+let finalCachedB = await coordinator.cachedState(for: bayB)
+Check.expect(
+    finalCachedA == stateA && finalCachedB == stateB,
+    "A and B caches remain independently inspectable"
+)
 
 let emptyCoordinator = LiveHydroCoordinator(provider: SequencedProvider([.failure]))
-let unavailable = await emptyCoordinator.refresh(waterBody: bay, referenceDate: retrievedAt)
-Check.expect(unavailable == .unavailable, "first network failure leaves Real Water unavailable")
+let unavailable = await emptyCoordinator.refresh(waterBody: bayA, referenceDate: retrievedAt)
+Check.expect(unavailable == .unavailable, "first network failure leaves that place unavailable")
 
-let cancellationProvider = CancellationThenSuccessProvider(state: state)
+let cancellationProvider = CancellationThenSuccessProvider(
+    canceledWaterBodyID: bayA.id,
+    states: [bayA.id: stateA, bayB.id: stateB]
+)
 let cancellationCoordinator = LiveHydroCoordinator(provider: cancellationProvider)
+let seededB = await cancellationCoordinator.refresh(waterBody: bayB, referenceDate: retrievedAt)
+if case .updated = seededB { Check.expect(true, "B cache seeds before A cancellation") }
+else { Check.expect(false, "B cache seeds before A cancellation") }
 let canceledTask = Task {
-    await cancellationCoordinator.refresh(waterBody: bay, referenceDate: retrievedAt)
+    await cancellationCoordinator.refresh(waterBody: bayA, referenceDate: retrievedAt)
 }
 try await Task.sleep(nanoseconds: 10_000_000)
 canceledTask.cancel()
 _ = await canceledTask.value
 let retryAfterCancellation = await cancellationCoordinator.refresh(
-    waterBody: bay,
+    waterBody: bayA,
     referenceDate: retrievedAt.addingTimeInterval(1)
 )
 if case .updated = retryAfterCancellation {
@@ -250,7 +334,19 @@ if case .updated = retryAfterCancellation {
     Check.expect(false, "canceled refresh does not throttle next activation")
 }
 let cancellationFetchCount = await cancellationProvider.count()
-Check.expect(cancellationFetchCount == 2, "next activation reaches provider after cancellation")
+Check.expect(cancellationFetchCount == 3, "next A activation reaches provider after cancellation")
+let bAfterACancellation = await cancellationCoordinator.refresh(
+    waterBody: bayB,
+    referenceDate: retrievedAt.addingTimeInterval(2)
+)
+if case let .preserved(preservedState, _) = bAfterACancellation {
+    Check.expect(preservedState == stateB, "canceling A does not mutate B refresh record")
+} else { Check.expect(false, "canceling A does not mutate B refresh record") }
+let cancellationFetchedIDs = await cancellationProvider.fetchedIDs()
+Check.expect(
+    cancellationFetchedIDs == [bayB.id, bayA.id, bayA.id],
+    "B remains throttled while canceled A retries independently"
+)
 
 if CommandLine.arguments.contains("--live") {
     print("\nLive NOAA smoke test")

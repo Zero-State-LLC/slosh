@@ -176,9 +176,13 @@ relevant product foundation is sound.
   entry combines NOAA CO-OPS water level, wind, and air pressure from `9414290`
   with observed currents from `s09010` bin 2. Provider networking and DTOs stay
   in `HydroProviders`; partial data and network failure preserve authored water.
-- **Still planned:** RW2C / RW3 foundation for a deliberately small curated
-  WaterBody catalog and explicit coverage model. General Places UX and automatic
-  discovery do not exist yet.
+- **RW2C provenance and freshness hardening complete:** refresh throttles,
+  last-valid states, and failure fallbacks are isolated by canonical
+  `WaterBody.id`. Per-measurement timestamps gate every interpreted signal at a
+  60-minute age limit and five-minute future-skew limit while stale raw evidence
+  remains preserved in `HydroState`.
+- **Next:** RW3 — Curated Places Catalog + Coverage Model. General Places UX and
+  automatic discovery do not exist yet.
 - Add USGS Water Data only where it contributes a distinct measurement. Use NOAA
   ERDDAP only as needed.
 - Prove the complete observation-to-render path before generalizing discovery.

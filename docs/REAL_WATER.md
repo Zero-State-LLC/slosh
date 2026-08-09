@@ -94,6 +94,31 @@ unknown → used
 suspect → ignored by HydroInterpreter
 ```
 
+Quality and freshness compose in one signal-usability rule. A measurement can
+affect forcing only when its unit matches the requested signal, its value is
+finite, its quality is not `suspect`, directional values declare a convention,
+and its effective observation timestamp is within the freshness and clock-skew
+bounds. `good` and `unknown` quality remain usable.
+
+## State freshness and signal freshness
+
+`HydroFreshness` remains the conservative status of the assembled snapshot.
+Signal usability is separate: it decides whether each individual measurement is
+allowed to affect `EnvironmentalForcing` and `HydroThemeModifiers`.
+
+```text
+measurement age <= 60 minutes  → usable
+measurement age > 60 minutes   → retained as evidence, ignored by HydroInterpreter
+measurement > 5 minutes future → ignored
+missing measurement timestamp  → use HydroState.observedAt
+```
+
+The thresholds are centralized in `HydroInterpreter.FreshnessThresholds`.
+Ignoring a signal never deletes or mutates it in `HydroState`. A state can
+therefore have a stale conservative summary while fresh component measurements
+still drive water, or contain one stale current that is ignored while fresh wind
+and waves remain active.
+
 ## Provenance rule
 
 Never fabricate an unavailable measurement. Missing values remain absent rather
@@ -161,7 +186,8 @@ NOAA CO-OPS JSON
 
 `HydroProviders` is a separate Swift package target. It owns `URLSession`, NOAA
 URLs, NOAA response DTOs, NOAA flags, parsing, aggregation, refresh policy, and
-the in-memory last-known valid state. `OceanCore` remains network-free and owns
+the in-memory place-scoped last-known valid states. `OceanCore` remains
+network-free and owns
 only provider-independent water-body and Hydro contracts. Source bindings use
 opaque namespaces, identifiers, capabilities, and string parameters; provider
 targets resolve only the namespaces they own and ignore all others.
@@ -219,6 +245,21 @@ aggregate state's `observedAt` is the **oldest valid product timestamp**, a
 conservative freshness summary that does not claim the whole state is newer than
 its least-recent component.
 
+### Multi-place isolation
+
+`LiveHydroCoordinator` keys every refresh record by canonical `WaterBody.id`.
+Each body has an independent:
+
+- refresh throttle;
+- last valid state;
+- failure fallback state.
+
+No cached state can cross body IDs, and a recent attempt for one body cannot
+suppress a provider fetch for another. Cancellation clears only the affected
+body's attempt timestamp, so that body can retry immediately without altering
+another body's throttle or cache. Cache inspection is place-scoped through
+`cachedState(for:)`; there is no ambiguous global last-state API.
+
 ### Live debug launch and lifecycle
 
 ```bash
@@ -249,7 +290,9 @@ Implemented in RW2B: the San Francisco Bay debug vertical slice. Not implemented
 a general Places UX, automatic station discovery, historical playback, forecast
 mode, persistent caching, or arbitrary geographic search.
 
-The next provider/product step is a curated WaterBody catalog and coverage model.
+RW2C completes the multi-place provenance and per-signal freshness hardening.
+The next provider/product step is **RW3 — Curated Places Catalog + Coverage
+Model**.
 USGS Water Data and NOAA ERDDAP remain future options only where they contribute
 a distinct, reviewed measurement.
 
