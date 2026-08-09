@@ -17,6 +17,8 @@ and Lake Tahoe. Catalog identity, reviewed coverage, and coordinates are local
 and remain available offline. Live status loads asynchronously per Place through
 the existing routed provider and coordinator architecture, so browsing never
 waits for networking and one Place cannot inherit another Place's result.
+The watch app does not link `HydroProviders` in shipping builds; it wears only
+local authored water until Real Water is promoted into a reviewed watch feature.
 
 The detail screen presents provider-independent freshness, all six display
 signal groups, observed/missing/stale/unsupported distinctions, values,
@@ -93,6 +95,13 @@ Provider DTO → HydroState → HydroInterpreter → HydroExperience
 `HydroInterpreter` deterministically translates valid measurements into
 normalized `EnvironmentalForcing` and renderer-vocabulary-only
 `HydroThemeModifiers`. Provider DTOs never enter `OceanCore`.
+
+Missing measurements are not converted to plausible defaults. When a provider
+slice lacks usable wave height or period, wave amplitude and wave rate remain
+zero, but the interpreter redistributes wave-dominant style authority to usable
+wind and current signals. That keeps San Francisco Bay style channels visible
+without fabricating wave observations; if wave data later arrives, the normal
+wave-weighted terms take over.
 
 The synthetic visual path is:
 
