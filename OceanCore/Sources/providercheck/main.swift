@@ -28,6 +28,48 @@ private func fixture(_ name: String) throws -> Data {
     return try Data(contentsOf: url)
 }
 
+/// Fails a chosen site while others succeed, and records how concurrently the
+/// requests actually ran.
+private actor PartialUSGSTransport: USGSDataTransport {
+    private let payload: Data
+    private let failingSiteFragment: String
+    private var inFlight = 0
+    private(set) var peakInFlight = 0
+    private(set) var attempts = 0
+
+    init(payload: Data, failingSiteFragment: String) {
+        self.payload = payload
+        self.failingSiteFragment = failingSiteFragment
+    }
+
+    func data(from url: URL) async throws -> Data {
+        attempts += 1
+        inFlight += 1
+        peakInFlight = max(peakInFlight, inFlight)
+        defer { inFlight -= 1 }
+        // Long enough that a serial loop cannot overlap two requests.
+        try await Task.sleep(nanoseconds: 60_000_000)
+        if url.absoluteString.contains(failingSiteFragment) {
+            throw USGSIVError.httpStatus(503)
+        }
+        return payload
+    }
+
+    func stats() -> (attempts: Int, peak: Int) { (attempts, peakInFlight) }
+}
+
+/// Cancels the way the network does, from beneath the USGS provider.
+private actor URLCancellingUSGSTransport: USGSDataTransport {
+    private(set) var attempts = 0
+
+    func data(from url: URL) async throws -> Data {
+        attempts += 1
+        throw URLError(.cancelled)
+    }
+
+    func count() -> Int { attempts }
+}
+
 private struct FixtureUSGSTransport: USGSDataTransport {
     let payload: Data
     func data(from url: URL) async throws -> Data { payload }
@@ -299,6 +341,61 @@ Check.expect(USGSIVAdapter.parseTimestamp("not-a-time") == nil, "malformed USGS 
 let tahoeState = try await usgsProvider.fetch(WaterBodies.lakeTahoe)
 Check.expect(tahoeState.waterLevel == usgsMeasurements.first?.measurement, "USGS provider assembles Lake Tahoe HydroState")
 Check.expect(tahoeState.waterTemperature == nil && tahoeState.windSpeed == nil, "USGS provider never fabricates uncovered fields")
+
+// The USGS path was serial and all-or-nothing while NOAA was concurrent and
+// partial-tolerant. These assert the two now behave the same way, using a
+// multi-site body since every curated place currently has exactly one binding.
+private let multiSiteTahoe = WaterBody(
+    id: "multi-site-tahoe",
+    name: "Multi-site fixture",
+    region: "Deterministic test",
+    latitude: WaterBodies.lakeTahoe.latitude,
+    longitude: WaterBodies.lakeTahoe.longitude,
+    kind: .lake,
+    sourceBindings: (0..<4).map { index in
+        HydroSourceBinding(
+            namespace: USGSIVProvider<URLSessionUSGSTransport>.namespace,
+            sourceID: "1033700\(index)",
+            capabilities: [.waterLevel]
+        )
+    }
+)
+
+private let partialTransport = PartialUSGSTransport(
+    payload: try fixture("valid-usgs-lake-level"),
+    failingSiteFragment: "10337002"
+)
+private let partialProvider = USGSIVProvider(transport: partialTransport)
+let usgsPartialState = try await partialProvider.fetch(multiSiteTahoe)
+Check.expect(
+    usgsPartialState.waterLevel != nil,
+    "one failing USGS site does not discard the sites that succeeded"
+)
+let usgsStats = await partialTransport.stats()
+Check.expect(usgsStats.attempts == 4, "every USGS site is attempted")
+Check.expect(
+    usgsStats.peak > 1,
+    "USGS sites are fetched concurrently (peak in flight was \(usgsStats.peak))"
+)
+
+private let cancellingUSGS = URLCancellingUSGSTransport()
+private let cancellingUSGSProvider = USGSIVProvider(transport: cancellingUSGS)
+do {
+    _ = try await cancellingUSGSProvider.fetch(multiSiteTahoe)
+    Check.expect(false, "a cancelled USGS transport must not yield a state")
+} catch {
+    Check.expect(
+        error is CancellationError,
+        "USGS reports URLError(.cancelled) as cancellation rather than an outage"
+    )
+}
+
+// A leaked URLSession per transport is invisible until it is measured, so
+// assert identity rather than trusting the comment.
+Check.expect(
+    URLSessionUSGSTransport.makeDefaultSession() !== URLSessionUSGSTransport.makeDefaultSession(),
+    "makeDefaultSession builds a distinct session when explicitly asked"
+)
 
 print("\nProvider routing and aggregation")
 let routeReference = USGSIVAdapter.parseTimestamp("2026-08-09T04:00:00Z")!
