@@ -1,0 +1,436 @@
+[
+  {
+    "caseID" : "accepted-inland-lake",
+    "decision" : {
+      "confidence" : "accepted",
+      "reasons" : [
+        "Authoritative feature and observation source identity evidence agree"
+      ]
+    },
+    "evidenceKinds" : [
+      "selectedPointContainedByFeature",
+      "geometryDatasetVersion",
+      "authoritativeFeatureClass",
+      "compatibleWaterBodyClass",
+      "authoritativeFeatureName",
+      "authoritativeHydrologicID",
+      "sourceContainedByFeature",
+      "productAvailable",
+      "providerSourceVersion"
+    ],
+    "explicitReasons" : [
+      "Selected point is inside Lake Tahoe authoritative feature.",
+      "Observation source identity evidence links the source to the same feature.",
+      "Reviewed product evidence is explicit."
+    ],
+    "featureCandidates" : [
+      {
+        "authority" : "U.S. Geological Survey, The National Map",
+        "collectionName" : "NHDWaterbody (MapServer layer 9)",
+        "containedSelectedPoint" : true,
+        "datasetVersion" : "Service data refreshed October 2022; fixture captured 2026-08-09",
+        "featureClass" : "lakePond",
+        "geometryReference" : "NHDWaterbody permanent_identifier 44560536; first exterior ring generalized with maxAllowableOffset=0.001 degrees",
+        "hydrologicUnitID" : "160501010003",
+        "id" : "44560536",
+        "name" : "Lake Tahoe",
+        "namespace" : "gov.usgs.nhdplus",
+        "productKind" : "lake",
+        "serviceReference" : "https:\/\/hydro.nationalmap.gov\/arcgis\/rest\/services\/NHDPlus_HR\/MapServer\/9\/query?f=geojson&where=Permanent_Identifier%3D%2744560536%27&outFields=Permanent_Identifier%2CGNIS_Name%2CFType%2CFCode%2CReachCode&returnGeometry=true&outSR=4326&maxAllowableOffset=0.001&geometryPrecision=5",
+        "sourceDataset" : "USGS The National Map NHDPlus High Resolution"
+      },
+      {
+        "authority" : "RW4F deterministic scenario fixture",
+        "collectionName" : "NHDFlowline buffered for deterministic prototype",
+        "containedSelectedPoint" : false,
+        "datasetVersion" : "Synthetic deterministic geometry for evaluator coverage; not an authoritative feature extract",
+        "featureClass" : "riverStream",
+        "geometryReference" : "research scenario geometry; not an NHD feature identity",
+        "hydrologicUnitID" : "160501020101",
+        "id" : "NHDHR-16050102-TRUCKEE-RIVER-FIXTURE",
+        "name" : "Truckee River",
+        "namespace" : "research.rw4f.fixture",
+        "productKind" : "river",
+        "serviceReference" : "https:\/\/hydro.nationalmap.gov\/arcgis\/rest\/services\/NHDPlus_HR\/MapServer",
+        "sourceDataset" : "NHDPlus HR schema-shaped scenario fixture"
+      },
+      {
+        "authority" : "RW4F deterministic scenario fixture",
+        "collectionName" : "NHDArea conservative bay polygon for deterministic prototype",
+        "containedSelectedPoint" : false,
+        "datasetVersion" : "Synthetic deterministic geometry for evaluator coverage; not an authoritative feature extract",
+        "featureClass" : "bay",
+        "geometryReference" : "research scenario geometry; not an NHD feature identity",
+        "hydrologicUnitID" : "180500040000",
+        "id" : "NHDHR-18050004-SAN-FRANCISCO-BAY-AREA-FIXTURE",
+        "name" : "San Francisco Bay",
+        "namespace" : "research.rw4f.fixture",
+        "productKind" : "bay",
+        "serviceReference" : "https:\/\/hydro.nationalmap.gov\/arcgis\/rest\/services\/NHDPlus_HR\/MapServer",
+        "sourceDataset" : "NHDPlus HR schema-shaped scenario fixture"
+      }
+    ],
+    "inputCoordinate" : {
+      "latitude" : 39.0968,
+      "longitude" : -120.0324
+    },
+    "observationCandidates" : [
+      {
+        "classHint" : "lake",
+        "distanceMeters" : 12598,
+        "hucEvidence" : "160501010101",
+        "id" : "10337000",
+        "name" : "LAKE TAHOE A TAHOE CITY CA",
+        "productEvidence" : [
+          "waterLevel"
+        ],
+        "provider" : "gov.usgs.waterdata.site"
+      }
+    ]
+  },
+  {
+    "caseID" : "truckee-river-nearer-rejected",
+    "decision" : {
+      "confidence" : "rejected",
+      "reasons" : [
+        "Candidate source belongs to a conflicting geographic feature"
+      ]
+    },
+    "evidenceKinds" : [
+      "selectedPointContainedByFeature",
+      "geometryDatasetVersion",
+      "authoritativeFeatureClass",
+      "compatibleWaterBodyClass",
+      "authoritativeFeatureName",
+      "authoritativeHydrologicID",
+      "proximityOnly",
+      "conflictingFeature",
+      "authoritativeHydrologicID"
+    ],
+    "explicitReasons" : [
+      "Truckee River observation is nearer but is a different authoritative feature.",
+      "Distance cannot override feature mismatch."
+    ],
+    "featureCandidates" : [
+      {
+        "authority" : "U.S. Geological Survey, The National Map",
+        "collectionName" : "NHDWaterbody (MapServer layer 9)",
+        "containedSelectedPoint" : true,
+        "datasetVersion" : "Service data refreshed October 2022; fixture captured 2026-08-09",
+        "featureClass" : "lakePond",
+        "geometryReference" : "NHDWaterbody permanent_identifier 44560536; first exterior ring generalized with maxAllowableOffset=0.001 degrees",
+        "hydrologicUnitID" : "160501010003",
+        "id" : "44560536",
+        "name" : "Lake Tahoe",
+        "namespace" : "gov.usgs.nhdplus",
+        "productKind" : "lake",
+        "serviceReference" : "https:\/\/hydro.nationalmap.gov\/arcgis\/rest\/services\/NHDPlus_HR\/MapServer\/9\/query?f=geojson&where=Permanent_Identifier%3D%2744560536%27&outFields=Permanent_Identifier%2CGNIS_Name%2CFType%2CFCode%2CReachCode&returnGeometry=true&outSR=4326&maxAllowableOffset=0.001&geometryPrecision=5",
+        "sourceDataset" : "USGS The National Map NHDPlus High Resolution"
+      },
+      {
+        "authority" : "RW4F deterministic scenario fixture",
+        "collectionName" : "NHDFlowline buffered for deterministic prototype",
+        "containedSelectedPoint" : false,
+        "datasetVersion" : "Synthetic deterministic geometry for evaluator coverage; not an authoritative feature extract",
+        "featureClass" : "riverStream",
+        "geometryReference" : "research scenario geometry; not an NHD feature identity",
+        "hydrologicUnitID" : "160501020101",
+        "id" : "NHDHR-16050102-TRUCKEE-RIVER-FIXTURE",
+        "name" : "Truckee River",
+        "namespace" : "research.rw4f.fixture",
+        "productKind" : "river",
+        "serviceReference" : "https:\/\/hydro.nationalmap.gov\/arcgis\/rest\/services\/NHDPlus_HR\/MapServer",
+        "sourceDataset" : "NHDPlus HR schema-shaped scenario fixture"
+      },
+      {
+        "authority" : "RW4F deterministic scenario fixture",
+        "collectionName" : "NHDArea conservative bay polygon for deterministic prototype",
+        "containedSelectedPoint" : false,
+        "datasetVersion" : "Synthetic deterministic geometry for evaluator coverage; not an authoritative feature extract",
+        "featureClass" : "bay",
+        "geometryReference" : "research scenario geometry; not an NHD feature identity",
+        "hydrologicUnitID" : "180500040000",
+        "id" : "NHDHR-18050004-SAN-FRANCISCO-BAY-AREA-FIXTURE",
+        "name" : "San Francisco Bay",
+        "namespace" : "research.rw4f.fixture",
+        "productKind" : "bay",
+        "serviceReference" : "https:\/\/hydro.nationalmap.gov\/arcgis\/rest\/services\/NHDPlus_HR\/MapServer",
+        "sourceDataset" : "NHDPlus HR schema-shaped scenario fixture"
+      }
+    ],
+    "inputCoordinate" : {
+      "latitude" : 39.0968,
+      "longitude" : -120.0324
+    },
+    "observationCandidates" : [
+      {
+        "classHint" : "river",
+        "distanceMeters" : 900,
+        "hucEvidence" : "160501020101",
+        "id" : "10338000",
+        "name" : "TRUCKEE R A TAHOE CITY CA",
+        "productEvidence" : [
+          "waterLevel"
+        ],
+        "provider" : "gov.usgs.waterdata.site"
+      },
+      {
+        "classHint" : "lake",
+        "distanceMeters" : 12598,
+        "hucEvidence" : "160501010101",
+        "id" : "10337000",
+        "name" : "LAKE TAHOE A TAHOE CITY CA",
+        "productEvidence" : [
+          "waterLevel"
+        ],
+        "provider" : "gov.usgs.waterdata.site"
+      }
+    ]
+  },
+  {
+    "caseID" : "river-flowline-needs-review",
+    "decision" : {
+      "confidence" : "needsReview",
+      "reasons" : [
+        "Candidates exist, but same-water-body identity is not proven"
+      ]
+    },
+    "evidenceKinds" : [
+      "selectedPointContainedByFeature",
+      "geometryDatasetVersion",
+      "authoritativeFeatureClass",
+      "compatibleWaterBodyClass",
+      "authoritativeFeatureName",
+      "authoritativeHydrologicID",
+      "proximityOnly",
+      "hydrologicallyConnected"
+    ],
+    "explicitReasons" : [
+      "Bounded flowline fixture resolves river identity.",
+      "Source-to-feature identity and reviewed products remain insufficient for acceptance."
+    ],
+    "featureCandidates" : [
+      {
+        "authority" : "U.S. Geological Survey, The National Map",
+        "collectionName" : "NHDWaterbody (MapServer layer 9)",
+        "containedSelectedPoint" : false,
+        "datasetVersion" : "Service data refreshed October 2022; fixture captured 2026-08-09",
+        "featureClass" : "lakePond",
+        "geometryReference" : "NHDWaterbody permanent_identifier 44560536; first exterior ring generalized with maxAllowableOffset=0.001 degrees",
+        "hydrologicUnitID" : "160501010003",
+        "id" : "44560536",
+        "name" : "Lake Tahoe",
+        "namespace" : "gov.usgs.nhdplus",
+        "productKind" : "lake",
+        "serviceReference" : "https:\/\/hydro.nationalmap.gov\/arcgis\/rest\/services\/NHDPlus_HR\/MapServer\/9\/query?f=geojson&where=Permanent_Identifier%3D%2744560536%27&outFields=Permanent_Identifier%2CGNIS_Name%2CFType%2CFCode%2CReachCode&returnGeometry=true&outSR=4326&maxAllowableOffset=0.001&geometryPrecision=5",
+        "sourceDataset" : "USGS The National Map NHDPlus High Resolution"
+      },
+      {
+        "authority" : "RW4F deterministic scenario fixture",
+        "collectionName" : "NHDFlowline buffered for deterministic prototype",
+        "containedSelectedPoint" : true,
+        "datasetVersion" : "Synthetic deterministic geometry for evaluator coverage; not an authoritative feature extract",
+        "featureClass" : "riverStream",
+        "geometryReference" : "research scenario geometry; not an NHD feature identity",
+        "hydrologicUnitID" : "160501020101",
+        "id" : "NHDHR-16050102-TRUCKEE-RIVER-FIXTURE",
+        "name" : "Truckee River",
+        "namespace" : "research.rw4f.fixture",
+        "productKind" : "river",
+        "serviceReference" : "https:\/\/hydro.nationalmap.gov\/arcgis\/rest\/services\/NHDPlus_HR\/MapServer",
+        "sourceDataset" : "NHDPlus HR schema-shaped scenario fixture"
+      },
+      {
+        "authority" : "RW4F deterministic scenario fixture",
+        "collectionName" : "NHDArea conservative bay polygon for deterministic prototype",
+        "containedSelectedPoint" : false,
+        "datasetVersion" : "Synthetic deterministic geometry for evaluator coverage; not an authoritative feature extract",
+        "featureClass" : "bay",
+        "geometryReference" : "research scenario geometry; not an NHD feature identity",
+        "hydrologicUnitID" : "180500040000",
+        "id" : "NHDHR-18050004-SAN-FRANCISCO-BAY-AREA-FIXTURE",
+        "name" : "San Francisco Bay",
+        "namespace" : "research.rw4f.fixture",
+        "productKind" : "bay",
+        "serviceReference" : "https:\/\/hydro.nationalmap.gov\/arcgis\/rest\/services\/NHDPlus_HR\/MapServer",
+        "sourceDataset" : "NHDPlus HR schema-shaped scenario fixture"
+      }
+    ],
+    "inputCoordinate" : {
+      "latitude" : 39.327,
+      "longitude" : -120.205
+    },
+    "observationCandidates" : [
+      {
+        "classHint" : "river",
+        "distanceMeters" : 0,
+        "hucEvidence" : "160501020101",
+        "id" : "10338500",
+        "name" : "TRUCKEE R NR TRUCKEE CA",
+        "productEvidence" : [
+
+        ],
+        "provider" : "gov.usgs.waterdata.site"
+      }
+    ]
+  },
+  {
+    "caseID" : "coastal-bay-needs-review",
+    "decision" : {
+      "confidence" : "needsReview",
+      "reasons" : [
+        "Candidates exist, but same-water-body identity is not proven"
+      ]
+    },
+    "evidenceKinds" : [
+      "selectedPointContainedByFeature",
+      "geometryDatasetVersion",
+      "authoritativeFeatureClass",
+      "compatibleWaterBodyClass",
+      "authoritativeFeatureName",
+      "authoritativeHydrologicID",
+      "proximityOnly",
+      "productAvailable"
+    ],
+    "explicitReasons" : [
+      "San Francisco Bay has a conservative NHDPlus-schema scenario feature containing the point; it is not asserted as an authoritative extract.",
+      "NOAA station proximity and product evidence do not prove same-feature identity.",
+      "Coastal automatic acceptance remains prohibited."
+    ],
+    "featureCandidates" : [
+      {
+        "authority" : "U.S. Geological Survey, The National Map",
+        "collectionName" : "NHDWaterbody (MapServer layer 9)",
+        "containedSelectedPoint" : false,
+        "datasetVersion" : "Service data refreshed October 2022; fixture captured 2026-08-09",
+        "featureClass" : "lakePond",
+        "geometryReference" : "NHDWaterbody permanent_identifier 44560536; first exterior ring generalized with maxAllowableOffset=0.001 degrees",
+        "hydrologicUnitID" : "160501010003",
+        "id" : "44560536",
+        "name" : "Lake Tahoe",
+        "namespace" : "gov.usgs.nhdplus",
+        "productKind" : "lake",
+        "serviceReference" : "https:\/\/hydro.nationalmap.gov\/arcgis\/rest\/services\/NHDPlus_HR\/MapServer\/9\/query?f=geojson&where=Permanent_Identifier%3D%2744560536%27&outFields=Permanent_Identifier%2CGNIS_Name%2CFType%2CFCode%2CReachCode&returnGeometry=true&outSR=4326&maxAllowableOffset=0.001&geometryPrecision=5",
+        "sourceDataset" : "USGS The National Map NHDPlus High Resolution"
+      },
+      {
+        "authority" : "RW4F deterministic scenario fixture",
+        "collectionName" : "NHDFlowline buffered for deterministic prototype",
+        "containedSelectedPoint" : false,
+        "datasetVersion" : "Synthetic deterministic geometry for evaluator coverage; not an authoritative feature extract",
+        "featureClass" : "riverStream",
+        "geometryReference" : "research scenario geometry; not an NHD feature identity",
+        "hydrologicUnitID" : "160501020101",
+        "id" : "NHDHR-16050102-TRUCKEE-RIVER-FIXTURE",
+        "name" : "Truckee River",
+        "namespace" : "research.rw4f.fixture",
+        "productKind" : "river",
+        "serviceReference" : "https:\/\/hydro.nationalmap.gov\/arcgis\/rest\/services\/NHDPlus_HR\/MapServer",
+        "sourceDataset" : "NHDPlus HR schema-shaped scenario fixture"
+      },
+      {
+        "authority" : "RW4F deterministic scenario fixture",
+        "collectionName" : "NHDArea conservative bay polygon for deterministic prototype",
+        "containedSelectedPoint" : true,
+        "datasetVersion" : "Synthetic deterministic geometry for evaluator coverage; not an authoritative feature extract",
+        "featureClass" : "bay",
+        "geometryReference" : "research scenario geometry; not an NHD feature identity",
+        "hydrologicUnitID" : "180500040000",
+        "id" : "NHDHR-18050004-SAN-FRANCISCO-BAY-AREA-FIXTURE",
+        "name" : "San Francisco Bay",
+        "namespace" : "research.rw4f.fixture",
+        "productKind" : "bay",
+        "serviceReference" : "https:\/\/hydro.nationalmap.gov\/arcgis\/rest\/services\/NHDPlus_HR\/MapServer",
+        "sourceDataset" : "NHDPlus HR schema-shaped scenario fixture"
+      }
+    ],
+    "inputCoordinate" : {
+      "latitude" : 37.806305,
+      "longitude" : -122.46589
+    },
+    "observationCandidates" : [
+      {
+        "classHint" : "estuary",
+        "distanceMeters" : 0,
+        "hucEvidence" : "180500040000",
+        "id" : "9414290",
+        "name" : "San Francisco",
+        "productEvidence" : [
+          "airPressure",
+          "waterLevel",
+          "wind"
+        ],
+        "provider" : "gov.noaa.coops.station"
+      }
+    ]
+  },
+  {
+    "caseID" : "offshore-not-computable",
+    "decision" : {
+      "confidence" : "notComputable",
+      "reasons" : [
+        "No supported authoritative feature\/provider coverage"
+      ]
+    },
+    "evidenceKinds" : [
+      "unsupportedRegion"
+    ],
+    "explicitReasons" : [
+      "Offshore coordinate is outside bounded inland authoritative fixture coverage."
+    ],
+    "featureCandidates" : [
+      {
+        "authority" : "U.S. Geological Survey, The National Map",
+        "collectionName" : "NHDWaterbody (MapServer layer 9)",
+        "containedSelectedPoint" : false,
+        "datasetVersion" : "Service data refreshed October 2022; fixture captured 2026-08-09",
+        "featureClass" : "lakePond",
+        "geometryReference" : "NHDWaterbody permanent_identifier 44560536; first exterior ring generalized with maxAllowableOffset=0.001 degrees",
+        "hydrologicUnitID" : "160501010003",
+        "id" : "44560536",
+        "name" : "Lake Tahoe",
+        "namespace" : "gov.usgs.nhdplus",
+        "productKind" : "lake",
+        "serviceReference" : "https:\/\/hydro.nationalmap.gov\/arcgis\/rest\/services\/NHDPlus_HR\/MapServer\/9\/query?f=geojson&where=Permanent_Identifier%3D%2744560536%27&outFields=Permanent_Identifier%2CGNIS_Name%2CFType%2CFCode%2CReachCode&returnGeometry=true&outSR=4326&maxAllowableOffset=0.001&geometryPrecision=5",
+        "sourceDataset" : "USGS The National Map NHDPlus High Resolution"
+      },
+      {
+        "authority" : "RW4F deterministic scenario fixture",
+        "collectionName" : "NHDFlowline buffered for deterministic prototype",
+        "containedSelectedPoint" : false,
+        "datasetVersion" : "Synthetic deterministic geometry for evaluator coverage; not an authoritative feature extract",
+        "featureClass" : "riverStream",
+        "geometryReference" : "research scenario geometry; not an NHD feature identity",
+        "hydrologicUnitID" : "160501020101",
+        "id" : "NHDHR-16050102-TRUCKEE-RIVER-FIXTURE",
+        "name" : "Truckee River",
+        "namespace" : "research.rw4f.fixture",
+        "productKind" : "river",
+        "serviceReference" : "https:\/\/hydro.nationalmap.gov\/arcgis\/rest\/services\/NHDPlus_HR\/MapServer",
+        "sourceDataset" : "NHDPlus HR schema-shaped scenario fixture"
+      },
+      {
+        "authority" : "RW4F deterministic scenario fixture",
+        "collectionName" : "NHDArea conservative bay polygon for deterministic prototype",
+        "containedSelectedPoint" : false,
+        "datasetVersion" : "Synthetic deterministic geometry for evaluator coverage; not an authoritative feature extract",
+        "featureClass" : "bay",
+        "geometryReference" : "research scenario geometry; not an NHD feature identity",
+        "hydrologicUnitID" : "180500040000",
+        "id" : "NHDHR-18050004-SAN-FRANCISCO-BAY-AREA-FIXTURE",
+        "name" : "San Francisco Bay",
+        "namespace" : "research.rw4f.fixture",
+        "productKind" : "bay",
+        "serviceReference" : "https:\/\/hydro.nationalmap.gov\/arcgis\/rest\/services\/NHDPlus_HR\/MapServer",
+        "sourceDataset" : "NHDPlus HR schema-shaped scenario fixture"
+      }
+    ],
+    "inputCoordinate" : {
+      "latitude" : 36.7,
+      "longitude" : -123.8
+    },
+    "observationCandidates" : [
+
+    ]
+  }
+]

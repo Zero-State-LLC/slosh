@@ -252,11 +252,25 @@ relevant product foundation is sound.
   evidence. Proximity, site class, and HUC remain evidence rather than identity;
   product capabilities are never inferred from location metadata. The adapters
   create no `WaterBody`, add no catalog entry, and have no product UI wiring.
-- **Next: RW4F — Authoritative Geographic Feature Resolver Prototype.** Evaluate
-  one bounded, reproducible feature-query/index approach for inland water-body
-  identity and containment. Compose its feature evidence with RW4E candidates in
-  research tooling only; preserve `needsReview` and `notComputable`, and do not
-  expose arbitrary map selection yet.
+- **RW4F complete:** a provider-independent authoritative geographic feature
+  resolver prototype now uses a captured, generalized polygon and stable identity
+  from the official USGS The National Map NHDPlus High Resolution `NHDWaterbody`
+  service for the primary Lake Tahoe containment case. NHD-specific DTOs remain
+  outside `OceanCore`. Separately labeled synthetic NHDPlus-schema scenarios cover
+  river-policy and conservative coastal decisions without claiming authoritative
+  feature extraction. Accepted inland
+  identity, explicit nearby Truckee River mismatch rejection, bounded river/flowline
+  `needsReview`, conservative San Francisco Bay `needsReview`,
+  offshore `notComputable`, deterministic geometry semantics, malformed-polygon fail-closed behavior, and the
+  single-ring/no-MultiPolygon prototype constraint are covered. No product UI,
+  arbitrary map selection, live NHD download, or catalog promotion was added.
+- **Next: RW4G — Feature + Observation Candidate Composition & Confidence Calibration.**
+  Expand authoritative-feature and observation fixtures across water-body classes,
+  then calibrate explicit evidence thresholds for `accepted`, `needsReview`,
+  `rejected`, and `notComputable`. Keep arbitrary geographic discovery in research
+  tooling until that calibration, a real authoritative feature service/index, a
+  review workflow, and Phase 0 evidence are available. Do not jump directly to
+  production arbitrary selection.
 
 ### RW5 — Historical playback
 

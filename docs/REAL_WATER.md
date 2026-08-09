@@ -76,6 +76,21 @@ capabilities can be attached only through a separate reviewed input. These APIs
 remain research tooling, create no `WaterBody`, do not change the curated catalog,
 and are not connected to the iPhone map.
 
+RW4F adds a research-only authoritative feature resolver prototype. The primary
+Lake Tahoe path uses a captured, generalized polygon and stable feature ID from
+the official USGS The National Map NHDPlus High Resolution `NHDWaterbody`
+service. NHD-specific DTO adaptation stays outside `OceanCore`, then composes
+portable feature identity, feature class, provenance, geometry/version, name,
+hydrologic ID, and containment evidence with provider candidates in
+`resolutioncheck`. Synthetic NHDPlus-schema scenario geometry is labeled as such
+and is used only for the bounded river policy and conservative San Francisco Bay
+`needsReview` cases. The accepted Tahoe case, explicit nearby Truckee River
+mismatch, river/flowline `needsReview`, coastal `needsReview`, and offshore
+`notComputable` are deterministic artifacts only. Geometry semantics are documented and tested: inside contains,
+outside excludes, boundary contains for candidate generation, malformed polygons
+fail closed, and MultiPolygon input is excluded from the prototype. No arbitrary
+map selection, product UI, live NHD fetch, or new Place is shipped.
+
 ## Two domains
 
 - **Experiences** are the existing authored `OceanTheme` modes. They define a

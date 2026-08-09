@@ -31,5 +31,10 @@ let package = Package(
             dependencies: ["OceanCore", "HydroProviders"],
             resources: [.process("Fixtures")]
         ),
+        .executableTarget(
+            name: "resolutioncheck",
+            dependencies: ["OceanCore", "HydroProviders"],
+            resources: [.process("Fixtures"), .copy("Artifacts")]
+        ),
     ]
 )

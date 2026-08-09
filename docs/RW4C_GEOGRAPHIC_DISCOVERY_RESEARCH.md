@@ -264,12 +264,32 @@ rejection, and the central rule that provider metadata alone remains
 `needsReview`. The adapters are not connected to normal iPhone or Watch UI and do
 not promote candidates into `WaterBody` values.
 
+**RW4F implementation status:** complete. `OceanCore` now has provider-independent
+authoritative feature resolver contracts, explicit `GeographicFeatureKind`,
+feature/source provenance fields for authority, dataset version, collection,
+service, geometry reference, deterministic bounding-box and polygon containment,
+and composition of authoritative feature evidence with RW4E-style observation
+candidates. `HydroProviders` owns the NHDPlus High Resolution-shaped fixture DTO
+adapter so NHD-specific JSON never enters `OceanCore`. `resolutioncheck` uses a
+captured, generalized official NHDPlus HR `NHDWaterbody` polygon and stable ID for
+Lake Tahoe. Separately labeled synthetic NHDPlus-schema scenario geometry covers
+the river-policy and coastal-conservatism cases without claiming authoritative
+feature extraction. The check writes deterministic JSON review artifacts,
+and proves accepted inland identity, explicit nearby Truckee River rejection,
+bounded river/flowline `needsReview`, conservative San Francisco
+Bay `needsReview`, offshore
+`notComputable`, inside/outside/boundary geometry semantics, malformed-polygon
+fail-closed behavior, the single-ring/no-MultiPolygon prototype constraint, and
+repeatable artifact encoding. It adds no product UI, no live NHD download, and no
+catalog entry.
+
 Suggested acceptance cases:
 
 - Lake Tahoe point resolves to the Tahoe feature and reviewed USGS site candidate;
 - a nearby Truckee River site is rejected as not the same water body;
-- San Francisco Bay produces multiple NOAA candidates and remains
-  `needsReview` without an authoritative basin association;
+- San Francisco Bay uses a conservative NHDPlus-schema scenario feature and
+  remains `needsReview` without station-to-feature identity evidence; the scenario
+  geometry is not presented as an authoritative extract;
 - offshore or unsupported coordinates return `notComputable`, not a fabricated
   Place.
 
@@ -282,3 +302,9 @@ rules, explicit uncertainty, and likely precomputed geospatial support.
 
 Phase 0 remains **OPEN / NOT_RUN**. This research provides no physical Watch
 evidence.
+
+The exact recommended next slice is **RW4G — Feature + Observation Candidate
+Composition & Confidence Calibration**. It should broaden deterministic fixture
+coverage and calibrate when explicit identity, class, hydrologic, and product
+evidence support `accepted` versus `needsReview`, without exposing arbitrary map
+selection in product UI.

@@ -75,6 +75,11 @@ public enum ResolutionEvidenceKind: String, Sendable, Equatable, Codable {
     case productAvailable
     case nameAgreement
     case proximityOnly
+    case geometryDatasetVersion
+    case authoritativeFeatureClass
+    case authoritativeFeatureName
+    case authoritativeHydrologicID
+    case providerSourceVersion
     case conflictingFeature
     case unsupportedRegion
 }
