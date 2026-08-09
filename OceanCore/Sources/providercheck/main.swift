@@ -53,6 +53,25 @@ private actor SequencedProvider: HydroStateProvider {
     func count() -> Int { fetchCount }
 }
 
+actor CancellationThenSuccessProvider: HydroStateProvider {
+    private let state: HydroState
+    private(set) var fetchCount = 0
+
+    init(state: HydroState) {
+        self.state = state
+    }
+
+    func fetch(_ waterBody: WaterBody) async throws -> HydroState {
+        fetchCount += 1
+        if fetchCount == 1 {
+            try await Task.sleep(nanoseconds: 10_000_000_000)
+        }
+        return state
+    }
+
+    func count() -> Int { fetchCount }
+}
+
 print("WaterBody and request contract")
 let bay = WaterBodies.sanFranciscoBay
 Check.expect(bay.id == "san-francisco-bay", "San Francisco Bay has a stable product id")
@@ -212,6 +231,26 @@ else { Check.expect(false, "network failure preserves last valid state") }
 let emptyCoordinator = LiveHydroCoordinator(provider: SequencedProvider([.failure]))
 let unavailable = await emptyCoordinator.refresh(waterBody: bay, referenceDate: retrievedAt)
 Check.expect(unavailable == .unavailable, "first network failure leaves Real Water unavailable")
+
+let cancellationProvider = CancellationThenSuccessProvider(state: state)
+let cancellationCoordinator = LiveHydroCoordinator(provider: cancellationProvider)
+let canceledTask = Task {
+    await cancellationCoordinator.refresh(waterBody: bay, referenceDate: retrievedAt)
+}
+try await Task.sleep(nanoseconds: 10_000_000)
+canceledTask.cancel()
+_ = await canceledTask.value
+let retryAfterCancellation = await cancellationCoordinator.refresh(
+    waterBody: bay,
+    referenceDate: retrievedAt.addingTimeInterval(1)
+)
+if case .updated = retryAfterCancellation {
+    Check.expect(true, "canceled refresh does not throttle next activation")
+} else {
+    Check.expect(false, "canceled refresh does not throttle next activation")
+}
+let cancellationFetchCount = await cancellationProvider.count()
+Check.expect(cancellationFetchCount == 2, "next activation reaches provider after cancellation")
 
 if CommandLine.arguments.contains("--live") {
     print("\nLive NOAA smoke test")
