@@ -50,6 +50,14 @@ reasonably around the current selected Place otherwise. Search remains local to
 the curated catalog. MapKit search, geocoding, station discovery, nearest-sensor
 matching, and dynamic WaterBody creation do not exist.
 
+RW4C evaluates what would be required to move beyond that curated catalog. Its
+decision is documented in
+[RW4C_GEOGRAPHIC_DISCOVERY_RESEARCH.md](RW4C_GEOGRAPHIC_DISCOVERY_RESEARCH.md):
+nearest-sensor matching is not a trustworthy water-body resolver. Future work
+must first identify an authoritative geographic feature, gather provider
+candidates, evaluate same-water-body evidence, and preserve explicit
+`needsReview` and `notComputable` outcomes.
+
 ## Two domains
 
 - **Experiences** are the existing authored `OceanTheme` modes. They define a

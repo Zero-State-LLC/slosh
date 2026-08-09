@@ -236,10 +236,16 @@ relevant product foundation is sound.
   and only the explicit wear action persists and transports selection.
 - Map annotations remain available offline and never expose provider stations as
   product pins. Search is local to the reviewed catalog.
-- **Next: RW4C — Arbitrary Geographic Discovery Feasibility & Dataset Resolution
-  Research.** Determine whether geographic water selection can be matched to a
-  trustworthy dataset without confusing nearest sensor with same water body.
-  Automatic discovery is not implemented.
+- **RW4C research complete:** NOAA CO-OPS metadata, USGS Water Data OGC APIs,
+  national hydrography, and NOAA ERDDAP can generate feature/dataset candidates,
+  but none makes nearest sensor equivalent to same water body. Trustworthy
+  resolution requires authoritative feature identity, class-specific evidence,
+  explicit confidence, and review. Automatic discovery remains unimplemented.
+- **Next: RW4D — Resolution Candidate Prototype.** Add fixture-backed candidate,
+  evidence, and confidence contracts; prove adversarial nearest-station rejection;
+  and keep all discovery behind DEBUG/research tooling. Do not create runtime
+  product Places yet. See
+  [RW4C_GEOGRAPHIC_DISCOVERY_RESEARCH.md](RW4C_GEOGRAPHIC_DISCOVERY_RESEARCH.md).
 
 ### RW5 — Historical playback
 

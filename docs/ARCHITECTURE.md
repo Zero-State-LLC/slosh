@@ -108,6 +108,13 @@ action calls the established selection persistence and transport path. The
 camera initially fits the complete catalog, or centers around the current worn
 Place when one exists. Arbitrary camera state is not persisted.
 
+RW4C preserves the same boundary for future discovery. Geographic feature
+resolution and provider catalog calls belong outside `OceanCore`. Portable logic
+may eventually own candidate evidence and confidence decisions, but an
+unreviewed candidate is not a `WaterBody`. Distance is a ranking signal only
+after positive same-water-body evidence, never an identity rule. See
+[RW4C_GEOGRAPHIC_DISCOVERY_RESEARCH.md](RW4C_GEOGRAPHIC_DISCOVERY_RESEARCH.md).
+
 ## Rendering
 
 ### Physical validation instrumentation
