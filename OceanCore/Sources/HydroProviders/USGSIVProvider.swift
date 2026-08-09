@@ -40,8 +40,29 @@ public protocol USGSDataTransport: Sendable {
 public struct URLSessionUSGSTransport: USGSDataTransport, @unchecked Sendable {
     private let session: URLSession
 
-    public init(session: URLSession = .shared) {
-        self.session = session
+    /// Shared rather than per-instance: `URLSession` retains itself until
+    /// `invalidateAndCancel()`, so building one per transport leaks a session
+    /// on every `RoutedHydroProvider.liveCurated()` call.
+    private static let defaultSession = makeDefaultSession()
+
+    public init(session: URLSession? = nil) {
+        self.session = session ?? Self.defaultSession
+    }
+
+    /// Matches the NOAA transport deliberately. `URLSession.shared` carries a
+    /// 60-second request timeout and a **seven-day** resource timeout, permits
+    /// expensive network access, and caches to disk — so a stalled USGS request
+    /// held the watch radio six times longer than the NOAA path allows, over
+    /// links NOAA explicitly refuses, and a cached 200 could be mistaken for a
+    /// fresh observation.
+    public static func makeDefaultSession() -> URLSession {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 10
+        configuration.timeoutIntervalForResource = 20
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.allowsExpensiveNetworkAccess = false
+        configuration.waitsForConnectivity = false
+        return URLSession(configuration: configuration)
     }
 
     public func data(from url: URL) async throws -> Data {
@@ -79,12 +100,41 @@ public struct USGSIVProvider<Transport: USGSDataTransport>: HydroStateProvider, 
     }
 
     public func fetch(_ waterBody: WaterBody) async throws -> HydroState {
-        var measurements: [USGSNormalizedMeasurement] = []
-        for request in requests(for: waterBody) {
-            guard let url = request.url else { throw USGSIVError.invalidRequest }
-            let data = try await transport.data(from: url)
-            measurements.append(contentsOf: try USGSIVAdapter.decode(data, siteID: request.siteID))
+        // Concurrent, cancellation-aware, and tolerant of a single site
+        // failing — mirroring the NOAA provider. Previously this was serial and
+        // all-or-nothing: one 503 discarded every site that had already
+        // succeeded, and a cancellation landing between two sites was invisible.
+        let requests = requests(for: waterBody)
+        let measurements = try await withThrowingTaskGroup(
+            of: [USGSNormalizedMeasurement].self
+        ) { group in
+            for request in requests {
+                try Task.checkCancellation()
+                group.addTask { [transport] in
+                    try Task.checkCancellation()
+                    do {
+                        guard let url = request.url else { throw USGSIVError.invalidRequest }
+                        let data = try await transport.data(from: url)
+                        return try USGSIVAdapter.decode(data, siteID: request.siteID)
+                    } catch let error as URLError where error.code == .cancelled {
+                        throw CancellationError()
+                    } catch is CancellationError {
+                        throw CancellationError()
+                    } catch {
+                        // Partial site coverage is normal. Individual failures
+                        // stay absent; an entirely empty aggregate fails below.
+                        return []
+                    }
+                }
+            }
+
+            var all: [USGSNormalizedMeasurement] = []
+            for try await batch in group {
+                all.append(contentsOf: batch)
+            }
+            return all
         }
+
         guard let observedAt = measurements.map(\.measurement.observedAt).compactMap({ $0 }).min()
         else { throw USGSIVError.noUsableMeasurements }
 
