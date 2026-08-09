@@ -45,6 +45,19 @@ is unavailable and scene setup belongs in `didChangeSize(_:)`. And
 `sceneDidLoad()` fires while the scene is still zero-sized, so anything sized
 from the scene must not be built there.
 
+## Real Water provider boundary
+
+`OceanCore` owns geographic product identity, opaque source bindings, the
+complete capability coverage model, and provider-independent Hydro values.
+`HydroProviders` owns NOAA CO-OPS and USGS NWIS URLs, transports, response DTOs,
+quality mapping, timestamp parsing, and unit conversion. Adding a provider does
+not add its DTOs or request vocabulary to the portable engine.
+
+The curated catalog deliberately publishes unavailable capabilities. A missing
+capability is not inferred from a failed request and is never replaced with a
+plausible default. Provider implementations resolve only bindings whose opaque
+namespace they own.
+
 ## Rendering
 
 Everything visible derives from **one analytic height field**, evaluated per

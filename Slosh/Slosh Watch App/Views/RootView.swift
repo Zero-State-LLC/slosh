@@ -25,10 +25,11 @@ struct RootView: View {
     private static let debugRealWaterBody: WaterBody? = {
         #if DEBUG && targetEnvironment(simulator)
         guard debugHydroExperience == nil,
-              let id = UserDefaults.standard.string(forKey: "realWater") else {
+              let id = UserDefaults.standard.string(forKey: "realWater"),
+              id == WaterBodies.sanFranciscoBay.id else {
             return nil
         }
-        return WaterBodies.body(id: id)
+        return WaterBodies.sanFranciscoBay
         #else
         return nil
         #endif

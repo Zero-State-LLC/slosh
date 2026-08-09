@@ -189,9 +189,13 @@ relevant product foundation is sound.
 
 ### RW3 — Curated Places catalog
 
-- Add a deliberately small catalog of well-supported bodies of water.
-- Publish measurement availability and provenance instead of promising uniform
-  coverage that providers cannot supply.
+- **RW3 complete:** San Francisco Bay, Monterey Bay, and Lake Tahoe form a
+  deliberately small reviewed catalog spanning NOAA CO-OPS coastal observations
+  and USGS NWIS inland gage height.
+- Every place publishes explicit `observed` or `unavailable` status for every
+  Hydro capability instead of promising uniform coverage.
+- **Next:** RW3A — compose provider selection at the application boundary and add
+  deliberate Places selection UX. Automatic discovery remains out of scope.
 
 ### RW4 — iPhone geographic discovery
 

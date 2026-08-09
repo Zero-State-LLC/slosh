@@ -37,10 +37,10 @@ built, rejected and thrown away.
 ## Future direction: Real Water
 
 Slosh contains authored water **Experiences**. An experimental DEBUG simulator
-vertical slice now adds one Real Water **Place**: San Francisco Bay, driven by
-public NOAA CO-OPS water-level, wind, pressure, and current observations through
-the provider-independent Hydro pipeline. This is an integration harness, not
-general geographic support or a Places UI; see
+vertical slice renders San Francisco Bay, while the reviewed Real Water catalog
+now also describes Monterey Bay and Lake Tahoe with explicit partial coverage.
+NOAA CO-OPS and USGS NWIS observations stay behind provider-independent Hydro
+contracts. This is not general geographic support or a Places UI; see
 [docs/REAL_WATER.md](docs/REAL_WATER.md) for coverage and provenance rules.
 
 ## Status

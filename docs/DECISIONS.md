@@ -164,3 +164,17 @@ These are load-bearing, not conveniences.
 
 Compiled out on real hardware so the drag gesture can never shadow a system edge
 swipe.
+
+---
+
+## 11. Curated coverage, not inferred capability
+
+**Decision:** ship a small reviewed `WaterBody` catalog whose coverage is
+explicit for every Hydro capability.
+
+Providers and stations expose uneven products. Inferring coverage from a
+successful request would make temporary outages look like permanent product
+changes, while assuming uniform coverage would invite fabricated defaults. The
+catalog therefore records opaque provider bindings and derives a complete
+`observed` / `unavailable` map from their reviewed capabilities. NOAA and USGS
+DTOs, quality flags, units, and request vocabulary remain in `HydroProviders`.

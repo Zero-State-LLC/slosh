@@ -1,0 +1,24 @@
+{
+  "value": {
+    "timeSeries": [
+      {
+        "variable": {
+          "variableCode": [{"value": "00065"}],
+          "unit": {"unitCode": "ft"},
+          "noDataValue": -999999.0
+        },
+        "values": [
+          {
+            "value": [
+              {
+                "value": "7.94",
+                "qualifiers": ["P"],
+                "dateTime": "2026-08-08T20:00:00.000-07:00"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

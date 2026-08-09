@@ -260,6 +260,30 @@ body's attempt timestamp, so that body can retry immediately without altering
 another body's throttle or cache. Cache inspection is place-scoped through
 `cachedState(for:)`; there is no ambiguous global last-state API.
 
+### Curated Places catalog and coverage
+
+RW3 keeps the catalog deliberately small and reviewed:
+
+| Place | Provider source | Reviewed observed coverage |
+|---|---|---|
+| San Francisco Bay | NOAA CO-OPS `9414290`; currents `s09010` bin 2 | water level, wind, pressure, current speed and direction |
+| Monterey Bay | NOAA CO-OPS `9413450` | water level, water temperature, pressure |
+| Lake Tahoe | USGS NWIS instantaneous values `10337000` | gage height as water level |
+
+Every `WaterBody` exposes a complete map over `HydroCapability`: each capability
+is either `observed` or `unavailable`. This prevents a partial station from being
+presented as uniformly instrumented. Monterey wind is unavailable in the
+reviewed latest-observation product and is not requested. Lake Tahoe does not
+claim wind, current, wave, pressure, salinity, or temperature coverage.
+
+USGS parameter `00065` reports gage height in feet. `USGSIVAdapter` converts it
+to canonical meters, preserves `usgs.nwis.<site>.00065` source identity and the
+source timestamp, maps approved values to `good`, provisional values to usable
+`unknown`, and unrecognized qualifiers to `suspect`. No USGS DTO enters
+`OceanCore`. Gage height is station-datum-relative stage, not elevation and not
+directly comparable to NOAA MLLW water level; the source identity must remain
+visible wherever these values are presented or interpreted.
+
 ### Live debug launch and lifecycle
 
 ```bash
@@ -290,9 +314,10 @@ Implemented in RW2B: the San Francisco Bay debug vertical slice. Not implemented
 a general Places UX, automatic station discovery, historical playback, forecast
 mode, persistent caching, or arbitrary geographic search.
 
-RW2C completes the multi-place provenance and per-signal freshness hardening.
-The next provider/product step is **RW3 — Curated Places Catalog + Coverage
-Model**.
+RW2C completed multi-place provenance and per-signal freshness hardening. RW3
+adds the reviewed three-place catalog and explicit coverage model without adding
+a Places UI. The next slice is **RW3A — Multi-provider application composition
+and Places selection UX**.
 USGS Water Data and NOAA ERDDAP remain future options only where they contribute
 a distinct, reviewed measurement.
 

@@ -32,6 +32,19 @@ public struct WaterBody: Identifiable, Sendable, Equatable {
             result.formUnion(binding.capabilities)
         }
     }
+
+    /// Explicit reviewed coverage for every canonical Hydro capability. Absence
+    /// is product information, not an invitation to fabricate a substitute.
+    public var coverage: [HydroCapability: HydroCoverageAvailability] {
+        Dictionary(uniqueKeysWithValues: HydroCapability.allCases.map { capability in
+            (capability, capabilities.contains(capability) ? .observed : .unavailable)
+        })
+    }
+}
+
+public enum HydroCoverageAvailability: String, Sendable, Equatable {
+    case observed
+    case unavailable
 }
 
 public enum WaterBodyKind: String, Sendable, Equatable {
@@ -101,7 +114,44 @@ public enum WaterBodies {
         ]
     )
 
-    public static let all: [WaterBody] = [sanFranciscoBay]
+    /// Reviewed NOAA coverage at Monterey station 9413450. Wind is deliberately
+    /// absent because the latest-observation product is not currently offered.
+    public static let montereyBay = WaterBody(
+        id: "monterey-bay",
+        name: "Monterey Bay",
+        region: "California, USA",
+        latitude: 36.6089,
+        longitude: -121.8914,
+        kind: .bay,
+        sourceBindings: [
+            HydroSourceBinding(
+                namespace: "gov.noaa.coops.station",
+                sourceID: "9413450",
+                capabilities: [.waterLevel, .waterTemperature, .airPressure]
+            ),
+        ]
+    )
+
+    /// Inland coverage from USGS instantaneous values. Parameter 00065 is gage
+    /// height; the provider converts reported feet to canonical meters.
+    public static let lakeTahoe = WaterBody(
+        id: "lake-tahoe",
+        name: "Lake Tahoe",
+        region: "California / Nevada, USA",
+        latitude: 39.1807175,
+        longitude: -120.1193368,
+        kind: .lake,
+        sourceBindings: [
+            HydroSourceBinding(
+                namespace: "gov.usgs.nwis.iv",
+                sourceID: "10337000",
+                capabilities: [.waterLevel],
+                parameters: ["waterLevelParameter": "00065"]
+            ),
+        ]
+    )
+
+    public static let all: [WaterBody] = [sanFranciscoBay, montereyBay, lakeTahoe]
 
     public static func body(id: String) -> WaterBody? {
         all.first { $0.id == id }

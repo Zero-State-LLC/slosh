@@ -28,6 +28,11 @@ private func fixture(_ name: String) throws -> Data {
     return try Data(contentsOf: url)
 }
 
+private struct FixtureUSGSTransport: USGSDataTransport {
+    let payload: Data
+    func data(from url: URL) async throws -> Data { payload }
+}
+
 private actor SequencedProvider: HydroStateProvider {
     enum Result: Sendable {
         case success(HydroState)
@@ -110,6 +115,15 @@ Check.expect(
     bay.capabilities == [.waterLevel, .wind, .airPressure, .currentSpeed, .currentDirection],
     "coverage exposes only reviewed live capabilities"
 )
+Check.expect(WaterBodies.all.map(\.id) == ["san-francisco-bay", "monterey-bay", "lake-tahoe"], "catalog order is curated and deterministic")
+Check.expect(Set(WaterBodies.all.map(\.id)).count == WaterBodies.all.count, "catalog ids are unique")
+Check.expect(WaterBodies.body(id: "monterey-bay") == WaterBodies.montereyBay, "Monterey resolves by canonical id")
+Check.expect(WaterBodies.body(id: "lake-tahoe") == WaterBodies.lakeTahoe, "Lake Tahoe resolves by canonical id")
+Check.expect(WaterBodies.montereyBay.capabilities == [.waterLevel, .waterTemperature, .airPressure], "Monterey publishes reviewed partial NOAA coverage")
+Check.expect(WaterBodies.montereyBay.coverage[.wind] == .unavailable, "Monterey does not promise unavailable wind")
+Check.expect(WaterBodies.lakeTahoe.coverage[.waterLevel] == .observed, "Lake Tahoe publishes observed inland water level")
+Check.expect(WaterBodies.lakeTahoe.coverage[.wind] == .unavailable, "Lake Tahoe exposes explicit unavailable capabilities")
+Check.expect(WaterBodies.all.allSatisfy { $0.coverage.count == HydroCapability.allCases.count }, "every place publishes complete capability coverage")
 
 let requestProvider = NOAACOOPSProvider(transport: URLSessionNOAATransport())
 let requests = requestProvider.requests(for: bay)
@@ -140,6 +154,31 @@ Check.expect(
     requestProvider.requests(for: unrelatedBody).isEmpty,
     "NOAA provider ignores bindings owned by other providers"
 )
+
+let montereyRequests = requestProvider.requests(for: WaterBodies.montereyBay)
+Check.expect(montereyRequests.map(\.product) == [.waterLevel, .waterTemperature, .airPressure], "Monterey requests only reviewed products")
+private let usgsProvider = USGSIVProvider(transport: FixtureUSGSTransport(payload: try fixture("valid-usgs-lake-level")))
+let tahoeRequests = usgsProvider.requests(for: WaterBodies.lakeTahoe)
+Check.expect(tahoeRequests.count == 1 && tahoeRequests[0].siteID == "10337000", "Lake Tahoe resolves to reviewed USGS site")
+Check.expect(tahoeRequests[0].parameterCodes == ["00065"], "Lake Tahoe requests only gage height")
+let tahoeURL = tahoeRequests[0].url?.absoluteString ?? ""
+Check.expect(tahoeURL.contains("format=json") && tahoeURL.contains("siteStatus=all"), "USGS request is deterministic JSON instantaneous values")
+Check.expect(usgsProvider.requests(for: bay).isEmpty, "USGS provider ignores NOAA-owned bindings")
+
+print("\nUSGS adapter")
+let usgsMeasurements = try USGSIVAdapter.decode(try fixture("valid-usgs-lake-level"), siteID: "10337000")
+Check.expect(usgsMeasurements.count == 1, "USGS fixture decodes one reviewed measurement")
+Check.equal(usgsMeasurements.first?.measurement.value, 7.94 * 0.3048, "USGS feet convert explicitly to meters")
+Check.expect(usgsMeasurements.first?.measurement.unit == .meters, "USGS water level carries canonical units")
+Check.expect(usgsMeasurements.first?.measurement.quality == .unknown, "USGS provisional data remains usable unknown quality")
+Check.expect(usgsMeasurements.first?.measurement.sourceID == "usgs.nwis.10337000.00065", "USGS source identity is preserved")
+Check.expect(USGSIVAdapter.mapQuality(["A"]) == .good, "USGS approved data maps to good")
+Check.expect(USGSIVAdapter.mapQuality(["P"]) == .unknown, "USGS provisional data maps to unknown")
+Check.expect(USGSIVAdapter.mapQuality(["Ice"]) == .suspect, "unrecognized USGS qualifiers fail closed")
+Check.expect(USGSIVAdapter.parseTimestamp("not-a-time") == nil, "malformed USGS timestamps fail closed")
+let tahoeState = try await usgsProvider.fetch(WaterBodies.lakeTahoe)
+Check.expect(tahoeState.waterLevel == usgsMeasurements.first?.measurement, "USGS provider assembles Lake Tahoe HydroState")
+Check.expect(tahoeState.waterTemperature == nil && tahoeState.windSpeed == nil, "USGS provider never fabricates uncovered fields")
 
 print("\nNOAA adapter")
 let level = try NOAAHydroAdapter.decode(
@@ -378,6 +417,18 @@ if CommandLine.arguments.contains("--live") {
         Check.expect(liveExperience.forcing.freshness != .unavailable, "live NOAA state is usable")
     } catch {
         Check.expect(false, "live NOAA smoke test succeeded: \(error)")
+    }
+
+    print("\nLive USGS smoke test")
+    do {
+        let liveUSGS = LiveUSGSIVProvider(transport: URLSessionUSGSTransport())
+        let liveTahoe = try await liveUSGS.fetch(WaterBodies.lakeTahoe)
+        print("  waterLevel: \(liveTahoe.waterLevel?.value ?? .nan) m")
+        print("  observedAt: \(liveTahoe.observedAt)")
+        Check.expect(liveTahoe.waterLevel != nil, "live USGS response produces Lake Tahoe water level")
+        Check.expect(liveTahoe.waterLevel?.sourceID == "usgs.nwis.10337000.00065", "live USGS response preserves source identity")
+    } catch {
+        Check.expect(false, "live USGS smoke test succeeded: \(error)")
     }
 }
 

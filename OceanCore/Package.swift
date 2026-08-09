@@ -18,8 +18,8 @@ let package = Package(
         // Metal and SwiftUI's colorEffect are both unavailable there.
         .target(name: "OceanUI", dependencies: ["OceanCore"]),
 
-        // Provider transport and adapters. URLSession, NOAA URLs, and NOAA DTOs
-        // stop here and never enter the portable OceanCore target.
+        // Provider transport and adapters. URLSession, provider URLs, and NOAA
+        // and USGS DTOs stop here and never enter the portable OceanCore target.
         .target(name: "HydroProviders", dependencies: ["OceanCore"]),
 
         // Test suite as a plain executable rather than XCTest: it runs from
