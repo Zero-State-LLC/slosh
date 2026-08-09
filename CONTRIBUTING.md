@@ -22,6 +22,21 @@ The engine builds without Xcode at all:
 cd OceanCore && swift build && swift run oceancheck
 ```
 
+## Verifying everything
+
+```bash
+./scripts/verify.sh            # four suites + all three app targets
+./scripts/verify.sh --suites   # suites only, no Xcode required
+```
+
+The package suites cover `OceanCore` and `HydroProviders` but never compile a
+line of the Watch or iPhone apps, so "the tests pass" and "the app builds" are
+genuinely different claims. The script makes the second one reproducible instead
+of depending on who last built locally — one machine had no iOS platform
+installed at all while the iPhone target sat on `main`. A missing platform is
+reported with the exact `xcodebuild -downloadPlatform` command rather than a
+raw destination error.
+
 ## Before opening a pull request
 
 1. `swift run oceancheck` passes.
