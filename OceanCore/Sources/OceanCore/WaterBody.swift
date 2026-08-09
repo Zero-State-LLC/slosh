@@ -54,17 +54,25 @@ public enum HydroCapability: String, Sendable, Equatable, Hashable, CaseIterable
     case currentDirection
 }
 
-public enum HydroSourceBinding: Sendable, Equatable {
-    case noaaCOOPSStation(stationID: String, capabilities: Set<HydroCapability>)
-    case noaaCOOPSCurrentStation(stationID: String, bin: Int?)
+/// An opaque binding from a product place to an external observation source.
+/// OceanCore does not interpret the namespace, source identifier, or parameters;
+/// provider targets own that resolution and may ignore bindings they do not own.
+public struct HydroSourceBinding: Sendable, Equatable {
+    public let namespace: String
+    public let sourceID: String
+    public let capabilities: Set<HydroCapability>
+    public let parameters: [String: String]
 
-    public var capabilities: Set<HydroCapability> {
-        switch self {
-        case let .noaaCOOPSStation(_, capabilities):
-            return capabilities
-        case .noaaCOOPSCurrentStation:
-            return [.currentSpeed, .currentDirection]
-        }
+    public init(
+        namespace: String,
+        sourceID: String,
+        capabilities: Set<HydroCapability>,
+        parameters: [String: String] = [:]
+    ) {
+        self.namespace = namespace
+        self.sourceID = sourceID
+        self.capabilities = capabilities
+        self.parameters = parameters
     }
 }
 
@@ -79,11 +87,17 @@ public enum WaterBodies {
         longitude: -122.46589,
         kind: .bay,
         sourceBindings: [
-            .noaaCOOPSStation(
-                stationID: "9414290",
+            HydroSourceBinding(
+                namespace: "gov.noaa.coops.station",
+                sourceID: "9414290",
                 capabilities: [.waterLevel, .wind, .airPressure]
             ),
-            .noaaCOOPSCurrentStation(stationID: "s09010", bin: 2),
+            HydroSourceBinding(
+                namespace: "gov.noaa.coops.current-station",
+                sourceID: "s09010",
+                capabilities: [.currentSpeed, .currentDirection],
+                parameters: ["bin": "2"]
+            ),
         ]
     )
 

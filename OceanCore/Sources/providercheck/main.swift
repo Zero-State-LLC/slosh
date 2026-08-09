@@ -59,6 +59,10 @@ Check.expect(bay.id == "san-francisco-bay", "San Francisco Bay has a stable prod
 Check.expect(bay.kind == .bay, "San Francisco Bay is classified as a bay")
 Check.expect(bay.sourceBindings.count == 2, "San Francisco Bay uses separate met and current bindings")
 Check.expect(
+    bay.sourceBindings.allSatisfy { !$0.namespace.isEmpty && !$0.sourceID.isEmpty },
+    "source bindings use provider-independent opaque identifiers"
+)
+Check.expect(
     bay.capabilities == [.waterLevel, .wind, .airPressure, .currentSpeed, .currentDirection],
     "coverage exposes only reviewed live capabilities"
 )
@@ -73,6 +77,25 @@ Check.expect(waterURL.contains("units=metric"), "requests require metric units")
 Check.expect(waterURL.contains("format=json"), "requests require JSON")
 Check.expect(waterURL.contains("datum=MLLW"), "water levels explicitly use MLLW")
 Check.expect(requests[3].url?.absoluteString.contains("bin=2") == true, "currents request uses reviewed real-time bin 2")
+
+let unrelatedBinding = HydroSourceBinding(
+    namespace: "example.other-provider",
+    sourceID: "opaque-source",
+    capabilities: [.waterLevel]
+)
+let unrelatedBody = WaterBody(
+    id: "unrelated",
+    name: "Unrelated",
+    region: "Test",
+    latitude: 0,
+    longitude: 0,
+    kind: .lake,
+    sourceBindings: [unrelatedBinding]
+)
+Check.expect(
+    requestProvider.requests(for: unrelatedBody).isEmpty,
+    "NOAA provider ignores bindings owned by other providers"
+)
 
 print("\nNOAA adapter")
 let level = try NOAAHydroAdapter.decode(

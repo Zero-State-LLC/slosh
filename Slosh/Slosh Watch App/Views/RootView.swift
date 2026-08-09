@@ -53,9 +53,11 @@ struct RootView: View {
         theme: .calmOcean,
         hydroExperience: RootView.debugHydroExperience
     )
+    #if DEBUG && targetEnvironment(simulator)
     @State private var realWaterCoordinator = RealWaterAppCoordinator(
         forceFailure: RootView.debugRealWaterForceFailure
     )
+    #endif
     @State private var crownEnergy = EnergyRange.default
 
     /// `simctl launch … -startInPicker YES` opens straight to the picker.
@@ -114,13 +116,10 @@ struct RootView: View {
             model.apply(energy: storedEnergy)
             model.haptics.isEnabled = hapticsEnabled
             model.startRunning()
-            realWaterCoordinator.activate(
-                waterBody: RootView.debugRealWaterBody,
-                model: model
-            )
+            activateRealWater()
         }
         .onDisappear {
-            realWaterCoordinator.deactivate()
+            deactivateRealWater()
             model.stopRunning()
         }
         .onChange(of: themeID) { _, newValue in
@@ -137,22 +136,36 @@ struct RootView: View {
             // Nothing runs unless the app is frontmost and the screen is lit.
             if phase == .active, !isLuminanceReduced {
                 model.startRunning()
-                realWaterCoordinator.activate(
-                    waterBody: RootView.debugRealWaterBody,
-                    model: model
-                )
+                activateRealWater()
             } else {
-                realWaterCoordinator.deactivate()
+                deactivateRealWater()
                 model.stopRunning()
             }
         }
         .onChange(of: isLuminanceReduced) { _, dimmed in
             if dimmed {
+                deactivateRealWater()
                 model.stopRunning()
             } else if scenePhase == .active {
                 model.startRunning()
+                activateRealWater()
             }
         }
+    }
+
+    private func activateRealWater() {
+        #if DEBUG && targetEnvironment(simulator)
+        realWaterCoordinator.activate(
+            waterBody: RootView.debugRealWaterBody,
+            model: model
+        )
+        #endif
+    }
+
+    private func deactivateRealWater() {
+        #if DEBUG && targetEnvironment(simulator)
+        realWaterCoordinator.deactivate()
+        #endif
     }
 
     @ViewBuilder

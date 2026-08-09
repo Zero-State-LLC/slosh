@@ -1,3 +1,4 @@
+#if DEBUG && targetEnvironment(simulator)
 import Foundation
 import HydroProviders
 import OceanCore
@@ -78,3 +79,4 @@ final class RealWaterAppCoordinator {
         Self.logger.notice("\(message, privacy: .public)")
     }
 }
+#endif

@@ -58,6 +58,9 @@ public struct URLSessionNOAATransport: NOAADataTransport, @unchecked Sendable {
 }
 
 public struct NOAACOOPSProvider<Transport: NOAADataTransport>: HydroStateProvider, Sendable {
+    public static var stationNamespace: String { "gov.noaa.coops.station" }
+    public static var currentStationNamespace: String { "gov.noaa.coops.current-station" }
+
     public let transport: Transport
 
     public init(transport: Transport) {
@@ -92,8 +95,10 @@ public struct NOAACOOPSProvider<Transport: NOAADataTransport>: HydroStateProvide
     public func requests(for waterBody: WaterBody) -> [NOAARequest] {
         var result: [NOAARequest] = []
         for binding in waterBody.sourceBindings {
-            switch binding {
-            case let .noaaCOOPSStation(stationID, capabilities):
+            switch binding.namespace {
+            case Self.stationNamespace:
+                let stationID = binding.sourceID
+                let capabilities = binding.capabilities
                 if capabilities.contains(.waterLevel) {
                     result.append(NOAARequest(stationID: stationID, product: .waterLevel))
                 }
@@ -109,8 +114,13 @@ public struct NOAACOOPSProvider<Transport: NOAADataTransport>: HydroStateProvide
                 if capabilities.contains(.salinity) {
                     result.append(NOAARequest(stationID: stationID, product: .salinity))
                 }
-            case let .noaaCOOPSCurrentStation(stationID, bin):
-                result.append(NOAARequest(stationID: stationID, product: .currents, bin: bin))
+            case Self.currentStationNamespace:
+                guard binding.capabilities.contains(.currentSpeed)
+                        || binding.capabilities.contains(.currentDirection) else { continue }
+                let bin = binding.parameters["bin"].flatMap(Int.init)
+                result.append(NOAARequest(stationID: binding.sourceID, product: .currents, bin: bin))
+            default:
+                continue
             }
         }
         return result

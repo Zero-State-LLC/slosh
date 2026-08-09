@@ -162,7 +162,9 @@ NOAA CO-OPS JSON
 `HydroProviders` is a separate Swift package target. It owns `URLSession`, NOAA
 URLs, NOAA response DTOs, NOAA flags, parsing, aggregation, refresh policy, and
 the in-memory last-known valid state. `OceanCore` remains network-free and owns
-only provider-independent water-body and Hydro contracts.
+only provider-independent water-body and Hydro contracts. Source bindings use
+opaque namespaces, identifiers, capabilities, and string parameters; provider
+targets resolve only the namespaces they own and ignore all others.
 
 ### San Francisco Bay bindings
 
@@ -226,8 +228,8 @@ xcrun simctl launch <watch-udid> com.example.Slosh.watchkitapp \
 
 The authored Calm ocean starts and renders before networking begins. A fetch is
 attempted on activation and no more often than every **10 minutes**. In-flight
-work is cancelled when the app backgrounds; no render-rate timer exists.
-Caching is in-memory only.
+work is cancelled when the app backgrounds or the display enters reduced
+luminance; no render-rate timer exists. Caching is in-memory only.
 
 Failure behavior is explicit:
 
