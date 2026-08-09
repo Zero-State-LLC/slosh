@@ -11,6 +11,8 @@ final class WatchSelectionSync: NSObject, WCSessionDelegate, @unchecked Sendable
     private static let envelopeKey = "selectedWaterEnvelope"
     private let session: WCSession?
     private var suppressNextCanonicalID: String?
+    private var pendingEnvelope: WaterSelectionEnvelope?
+    private var newestEnvelope: WaterSelectionEnvelope?
 
     override init() {
         session = WCSession.isSupported() ? .default : nil
@@ -38,9 +40,16 @@ final class WatchSelectionSync: NSObject, WCSessionDelegate, @unchecked Sendable
         _ session: WCSession,
         activationDidCompleteWith activationState: WCSessionActivationState,
         error: Error?
-    ) {}
+    ) {
+        deliver(session.receivedApplicationContext)
+        flushPendingIfPossible()
+    }
 
     func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) {
+        deliver(applicationContext)
+    }
+
+    private func deliver(_ applicationContext: [String: Any]) {
         guard let data = applicationContext["selectedWater"] as? Data,
               let incoming = try? JSONDecoder().decode(WaterSelectionEnvelope.self, from: data),
               incoming.selection.isCatalogValid else { return }
@@ -59,6 +68,10 @@ final class WatchSelectionSync: NSObject, WCSessionDelegate, @unchecked Sendable
         case let .place(waterBodyID):
             UserDefaults.standard.set(waterBodyID, forKey: SettingsKey.placeID)
         }
+        DispatchQueue.main.async { [weak self] in
+            guard self?.suppressNextCanonicalID == incoming.selection.canonicalID else { return }
+            self?.suppressNextCanonicalID = nil
+        }
     }
 
     private var savedEnvelope: WaterSelectionEnvelope? {
@@ -72,7 +85,23 @@ final class WatchSelectionSync: NSObject, WCSessionDelegate, @unchecked Sendable
     }
 
     private func send(_ envelope: WaterSelectionEnvelope) {
-        guard let session, let data = try? JSONEncoder().encode(envelope) else { return }
-        try? session.updateApplicationContext(["selectedWater": data])
+        let resolved = envelope.replacing(newestEnvelope)
+        guard resolved == envelope else { return }
+        newestEnvelope = envelope
+        pendingEnvelope = envelope
+        flushPendingIfPossible()
+    }
+
+    private func flushPendingIfPossible() {
+        guard let session, session.activationState == .activated, let envelope = pendingEnvelope else { return }
+        guard let data = try? JSONEncoder().encode(envelope) else { return }
+        do {
+            try session.updateApplicationContext(["selectedWater": data])
+            if pendingEnvelope == envelope {
+                pendingEnvelope = nil
+            }
+        } catch {
+            // Keep the latest envelope queued. Activation or the next local pick retries it.
+        }
     }
 }
