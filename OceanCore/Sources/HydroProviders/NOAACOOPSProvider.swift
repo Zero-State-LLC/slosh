@@ -86,37 +86,65 @@ public struct NOAACOOPSProvider<Transport: NOAADataTransport>: HydroStateProvide
 
     public func fetch(_ waterBody: WaterBody) async throws -> HydroState {
         let requests = requests(for: waterBody)
-        let samples = try await withThrowingTaskGroup(of: NOAAProductSample?.self) { group in
+        let (samples, failures) = await withTaskGroup(
+            of: Result<NOAAProductSample?, Error>.self,
+            returning: ([NOAAProductSample], [Error]).self
+        ) { group in
             for request in requests {
-                try Task.checkCancellation()
                 group.addTask { [transport] in
-                    try Task.checkCancellation()
+                    if Task.isCancelled { return .failure(CancellationError()) }
                     do {
                         guard let url = request.url else { throw NOAAProviderError.invalidRequest }
                         let data = try await transport.data(from: url)
                         let sample = try NOAAHydroAdapter.decode(
                             data, product: request.product, stationID: request.stationID
                         )
-                        return sample.hasMeasurement ? sample : nil
+                        return .success(sample.hasMeasurement ? sample : nil)
                     } catch let error as URLError where error.code == .cancelled {
-                        throw CancellationError()
+                        return .failure(CancellationError())
                     } catch is CancellationError {
-                        throw CancellationError()
+                        return .failure(CancellationError())
                     } catch {
                         // Partial product coverage is normal. Individual failures stay
                         // absent; only an entirely empty aggregate fails below.
-                        return nil
+                        return .failure(error)
                     }
                 }
             }
 
             var samples: [NOAAProductSample] = []
-            for try await sample in group {
-                if let sample { samples.append(sample) }
+            var failures: [Error] = []
+            for await result in group {
+                switch result {
+                case let .success(sample):
+                    if let sample { samples.append(sample) }
+                case let .failure(error):
+                    failures.append(error)
+                }
             }
-            return samples
+            return (samples, failures)
+        }
+
+        if failures.contains(where: Self.isCancellationFailure) {
+            throw CancellationError()
+        }
+        if samples.isEmpty {
+            if let terminalFailure = failures.first(where: Self.isTerminalFailure) {
+                throw terminalFailure
+            }
+            throw NOAAProviderError.noUsableMeasurements
         }
         return try NOAAHydroAggregator.state(samples: samples, retrievedAt: Date())
+    }
+
+    private static func isTerminalFailure(_ error: Error) -> Bool {
+        guard let providerError = error as? NOAAProviderError else { return false }
+        if case .providerMessage = providerError { return true }
+        return false
+    }
+
+    private static func isCancellationFailure(_ error: Error) -> Bool {
+        error is CancellationError
     }
 
     public func requests(for waterBody: WaterBody) -> [NOAARequest] {

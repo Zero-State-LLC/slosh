@@ -47,7 +47,7 @@ public enum NOAAHydroAdapter {
         }
 
         var sample = NOAAProductSample(observedAt: observedAt)
-        let quality = mapQuality(flags: observation.f, assurance: observation.q)
+        let quality = mapQuality(flags: observation.f, assurance: observation.q, product: product)
         let sourcePrefix = "noaa.coops.\(stationID).\(product.rawValue)"
 
         switch product {
@@ -98,10 +98,28 @@ public enum NOAAHydroAdapter {
         return sample
     }
 
-    public static func mapQuality(flags: String?, assurance: String?) -> HydroQuality {
+    /// CO-OPS QC flags vary by product and include leading count in water-level.
+    public static func mapQuality(
+        flags: String?,
+        assurance: String?,
+        product: NOAAProduct = .waterLevel
+    ) -> HydroQuality {
         guard let flags, !flags.isEmpty else { return .unknown }
         let values = flags.split(separator: ",", omittingEmptySubsequences: false)
-        if values.contains(where: { $0.trimmingCharacters(in: .whitespaces) != "0" }) {
+
+        let relevantFlags: ArraySlice<Substring>
+        switch product {
+        case .waterLevel:
+            // Water level's first flag is a sample-count; only the remaining
+            // flags are booleans.
+            relevantFlags = values.dropFirst()
+        case .currents, .salinity:
+            relevantFlags = []
+        default:
+            relevantFlags = values[...]
+        }
+
+        if relevantFlags.contains(where: { $0.trimmingCharacters(in: .whitespaces) != "0" }) {
             return .suspect
         }
         if let assurance, !["p", "v"].contains(assurance.lowercased()) {

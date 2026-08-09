@@ -97,6 +97,34 @@ private actor URLCancelledNOAATransport: NOAADataTransport {
     func products() -> [String] { requestedProducts }
 }
 
+actor ProductPayloadNOAATransport: NOAADataTransport {
+    private let payloads: [String: Data]
+    private let productWithFailure: String?
+    private let failure: Error
+    private(set) var requestedProducts: [String] = []
+
+    init(payloads: [String: Data], productWithFailure: String? = nil, failure: Error = NOAAProviderError.noUsableMeasurements) {
+        self.payloads = payloads
+        self.productWithFailure = productWithFailure
+        self.failure = failure
+    }
+
+    func data(from url: URL) async throws -> Data {
+        let product = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?
+            .first(where: { $0.name == "product" })?
+            .value ?? ""
+        requestedProducts.append(product)
+        if product == productWithFailure { throw failure }
+        guard let payload = payloads[product] else {
+            throw NOAAProviderError.noUsableMeasurements
+        }
+        return payload
+    }
+
+    func products() -> [String] { requestedProducts }
+}
+
 private actor ConcurrentNOAATransport: NOAADataTransport {
     private let payloads: [String: Data]
     private var activeRequests = 0
@@ -570,6 +598,11 @@ let suspect = try NOAAHydroAdapter.decode(
     fixture("suspect-water-level"), product: .waterLevel, stationID: "9414290"
 )
 Check.expect(suspect.waterLevel?.quality == .suspect, "nonzero NOAA QC flag maps to suspect")
+
+let counted = try NOAAHydroAdapter.decode(
+    fixture("count-noaa-water-level"), product: .waterLevel, stationID: "9414290"
+)
+Check.expect(counted.waterLevel?.quality == .good, "water-level count flag does not trigger suspect")
 let suspectState = try NOAAHydroAggregator.state(
     samples: [suspect], retrievedAt: suspect.observedAt
 )
@@ -588,6 +621,72 @@ do {
     if case .providerMessage = error { providerErrorWasTyped = true }
 }
 Check.expect(providerErrorWasTyped, "provider error JSON becomes a typed error")
+
+let partialNoaaTransport = ProductPayloadNOAATransport(
+    payloads: [
+        "wind": try fixture("valid-wind"),
+        "currents": try fixture("provider-error"),
+    ],
+    productWithFailure: "currents",
+    failure: NOAAProviderError.providerMessage("No data was found. This product may not be offered at this station at the requested time.")
+)
+let partialNoaaBody = WaterBody(
+    id: "partial-noaa",
+    name: "Partial NOAA",
+    region: "Deterministic test",
+    latitude: WaterBodies.sanFranciscoBay.latitude,
+    longitude: WaterBodies.sanFranciscoBay.longitude,
+    kind: .bay,
+    sourceBindings: [
+        HydroSourceBinding(
+            namespace: NOAACOOPSProvider<URLSessionNOAATransport>.stationNamespace,
+            sourceID: "9414290",
+            capabilities: [.wind]
+        ),
+        HydroSourceBinding(
+            namespace: NOAACOOPSProvider<URLSessionNOAATransport>.currentStationNamespace,
+            sourceID: "s09010",
+            capabilities: [.currentSpeed, .currentDirection],
+            parameters: ["bin": "2"]
+        ),
+    ]
+)
+let partialNoaaProvider = NOAACOOPSProvider(transport: partialNoaaTransport)
+let partialNoaa = try await partialNoaaProvider.fetch(partialNoaaBody)
+Check.expect(partialNoaa.windSpeed != nil, "NOAA provider exposes partial product when another product returns provider message")
+Check.expect(partialNoaa.currentSpeed == nil && partialNoaa.currentDirection == nil, "Noaa current returns absent from provider-message failures")
+
+let terminalNoaaTransport = ProductPayloadNOAATransport(
+    payloads: [
+        "currents": try fixture("provider-error")
+    ],
+    productWithFailure: "currents",
+    failure: NOAAProviderError.providerMessage("No data was found. This product may not be offered at this station at the requested time.")
+)
+let terminalNoaaBody = WaterBody(
+    id: "terminal-noaa",
+    name: "Terminal NOAA",
+    region: "Deterministic test",
+    latitude: WaterBodies.sanFranciscoBay.latitude,
+    longitude: WaterBodies.sanFranciscoBay.longitude,
+    kind: .bay,
+    sourceBindings: [
+        HydroSourceBinding(
+            namespace: NOAACOOPSProvider<URLSessionNOAATransport>.currentStationNamespace,
+            sourceID: "s09010",
+            capabilities: [.currentSpeed, .currentDirection],
+            parameters: ["bin": "2"]
+        )
+    ]
+)
+let terminalNoaaProvider = NOAACOOPSProvider(transport: terminalNoaaTransport)
+var terminalNoaaError = false
+do {
+    _ = try await terminalNoaaProvider.fetch(terminalNoaaBody)
+} catch let error as NOAAProviderError {
+    if case .providerMessage = error { terminalNoaaError = true }
+}
+Check.expect(terminalNoaaError, "all NOAA failures for one body surface provider-message as a terminal error")
 
 var timestampWasRejected = false
 do {
