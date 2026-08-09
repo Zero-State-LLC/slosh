@@ -504,6 +504,71 @@ Check.expect(
     "B remains throttled while canceled A retries independently"
 )
 
+print("\nProvider metadata candidate adapters")
+let tahoeCoordinate = GeographicCoordinate(
+    latitude: WaterBodies.lakeTahoe.latitude,
+    longitude: WaterBodies.lakeTahoe.longitude
+)
+let noaaMetadataRequest = NOAACOOPSMetadataRequest(stationID: "9414290")
+Check.expect(
+    noaaMetadataRequest.url?.absoluteString == "https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations/9414290.json",
+    "NOAA metadata request uses the public station endpoint"
+)
+let noaaCandidates = try NOAACOOPSMetadataCandidateAdapter.decode(
+    fixture("noaa-stations-metadata"),
+    selectedCoordinate: GeographicCoordinate(latitude: 37.806305, longitude: -122.46589)
+)
+Check.expect(noaaCandidates.map(\.source.sourceID) == ["9414290", "9413450"], "NOAA metadata candidates sort deterministically by distance")
+Check.expect(noaaCandidates[0].source.capabilities.isEmpty, "NOAA station metadata does not invent product capabilities")
+Check.expect(noaaCandidates[0].evidence.map(\.kind) == [.proximityOnly], "NOAA station metadata supplies proximity evidence only")
+let reviewedNOAACandidates = try NOAACOOPSMetadataCandidateAdapter.decode(
+    fixture("noaa-stations-metadata"),
+    selectedCoordinate: GeographicCoordinate(latitude: 37.806305, longitude: -122.46589),
+    reviewedCapabilities: ["9414290": [.waterLevel, .wind]]
+)
+Check.expect(reviewedNOAACandidates[0].source.capabilities == [.waterLevel, .wind], "separately reviewed NOAA capabilities remain explicit")
+Check.expect(reviewedNOAACandidates[0].evidence.contains { $0.kind == .productAvailable }, "reviewed NOAA product availability is recorded as separate evidence")
+
+let usgsRequest = USGSMonitoringLocationsRequest(center: tahoeCoordinate, radiusDegrees: 0.25, limit: 25)
+let usgsURL = usgsRequest.url?.absoluteString ?? ""
+Check.expect(usgsURL.contains("monitoring-locations/items"), "USGS metadata request uses the public OGC collection")
+Check.expect(usgsURL.contains("bbox="), "USGS metadata request is geographically bounded")
+Check.expect(USGSMonitoringLocationsRequest(center: tahoeCoordinate, radiusDegrees: -1).url == nil, "USGS metadata request rejects invalid radius")
+let usgsCandidates = try USGSMonitoringLocationCandidateAdapter.decode(
+    fixture("usgs-monitoring-locations"),
+    selectedCoordinate: tahoeCoordinate
+)
+Check.expect(usgsCandidates.map(\.source.sourceID) == ["10337000", "10336635"], "USGS candidates sort by distance rather than response order")
+Check.expect(usgsCandidates[0].source.locationKind == .lake, "USGS lake site class maps to provider-independent lake kind")
+Check.expect(usgsCandidates[1].source.locationKind == .river, "USGS stream site class maps to provider-independent river kind")
+Check.expect(usgsCandidates.allSatisfy { $0.source.capabilities.isEmpty }, "USGS location metadata does not imply observation products")
+Check.expect(usgsCandidates[0].evidence.contains { $0.kind == .hydrologicallyConnected }, "USGS HUC is preserved as hydrologic evidence")
+Check.expect(usgsCandidates[1].evidence.contains { $0.kind == .proximityOnly }, "nearby tributary remains proximity evidence, not lake identity")
+let metadataOnlyDecision = WaterBodyResolutionEvaluator().evaluate(.init(
+    feature: GeographicFeatureIdentity(
+        namespace: "fixture.feature",
+        featureID: "lake-tahoe",
+        name: "Lake Tahoe",
+        kind: .lake,
+        representativeCoordinate: tahoeCoordinate
+    ),
+    observationSources: usgsCandidates.map(\.source),
+    evidence: usgsCandidates.flatMap(\.evidence)
+))
+Check.expect(metadataOnlyDecision.confidence == .needsReview, "provider metadata alone cannot accept a WaterBody resolution")
+let encodedMetadataCandidates = try JSONEncoder().encode(usgsCandidates)
+Check.expect(
+    !encodedMetadataCandidates.isEmpty,
+    "provider metadata candidates encode as portable research artifacts"
+)
+
+do {
+    _ = try NOAACOOPSMetadataCandidateAdapter.decode(Data("{}".utf8), selectedCoordinate: tahoeCoordinate)
+    Check.expect(false, "malformed NOAA metadata fails closed")
+} catch {
+    Check.expect(true, "malformed NOAA metadata fails closed")
+}
+
 if CommandLine.arguments.contains("--live") {
     print("\nLive NOAA smoke test")
     let liveProvider = LiveNOAACOOPSProvider()
@@ -546,6 +611,32 @@ if CommandLine.arguments.contains("--live") {
         Check.expect(liveTahoe.waterLevel?.sourceID == "usgs.nwis.10337000.00065", "live USGS response preserves source identity")
     } catch {
         Check.expect(false, "live USGS smoke test succeeded: \(error)")
+    }
+
+    print("\nLive provider metadata smoke test")
+    do {
+        let noaaMetadataURL = NOAACOOPSMetadataRequest(stationID: "9414290").url!
+        let noaaMetadataData = try await URLSessionNOAATransport().data(from: noaaMetadataURL)
+        let liveNOAACandidates = try NOAACOOPSMetadataCandidateAdapter.decode(
+            noaaMetadataData,
+            selectedCoordinate: GeographicCoordinate(latitude: bay.latitude, longitude: bay.longitude)
+        )
+        Check.expect(liveNOAACandidates.first?.source.sourceID == "9414290", "live NOAA metadata produces the requested station candidate")
+
+        let usgsMetadataURL = USGSMonitoringLocationsRequest(
+            center: tahoeCoordinate,
+            radiusDegrees: 0.2,
+            limit: 25
+        ).url!
+        let usgsMetadataData = try await URLSessionUSGSTransport().data(from: usgsMetadataURL)
+        let liveUSGSCandidates = try USGSMonitoringLocationCandidateAdapter.decode(
+            usgsMetadataData,
+            selectedCoordinate: tahoeCoordinate
+        )
+        Check.expect(!liveUSGSCandidates.isEmpty, "live USGS metadata produces bounded monitoring-location candidates")
+        Check.expect(liveUSGSCandidates.allSatisfy { $0.source.capabilities.isEmpty }, "live USGS metadata remains capability-conservative")
+    } catch {
+        Check.expect(false, "live provider metadata smoke test succeeded: \(error)")
     }
 }
 

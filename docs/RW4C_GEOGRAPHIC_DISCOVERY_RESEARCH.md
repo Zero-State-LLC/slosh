@@ -256,6 +256,14 @@ candidate/evidence/confidence model, deterministic evaluator, fixture provider,
 explicit reviewed-promotion gate, JSON artifact encoding, and adversarial tests.
 It intentionally added no live metadata adapters or product UI.
 
+**RW4E implementation status:** complete. `HydroProviders` now contains bounded
+NOAA CO-OPS MDAPI and USGS Water Data OGC request builders plus pure metadata
+adapters. Fixtures prove deterministic distance ordering, conservative site-class
+mapping, HUC preservation, explicit reviewed NOAA product input, malformed-data
+rejection, and the central rule that provider metadata alone remains
+`needsReview`. The adapters are not connected to normal iPhone or Watch UI and do
+not promote candidates into `WaterBody` values.
+
 Suggested acceptance cases:
 
 - Lake Tahoe point resolves to the Tahoe feature and reviewed USGS site candidate;

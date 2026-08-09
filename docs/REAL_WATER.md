@@ -65,6 +65,15 @@ cannot replace a Lake Tahoe source, coastal name/proximity evidence remains
 candidates with separately reviewed bindings can be promoted. It performs no
 live discovery and is not exposed in the iPhone product UI.
 
+RW4E adds deterministic adapters for public NOAA CO-OPS station metadata and USGS
+Water Data OGC monitoring-location metadata. They return provider-independent
+observation candidates plus raw evidence such as distance, site class, and HUC.
+Distance remains `proximityOnly`; a HUC is basin evidence rather than same-feature
+proof. USGS location metadata does not imply product availability. NOAA product
+capabilities can be attached only through a separate reviewed input. These APIs
+remain research tooling, create no `WaterBody`, do not change the curated catalog,
+and are not connected to the iPhone map.
+
 ## Two domains
 
 - **Experiences** are the existing authored `OceanTheme` modes. They define a

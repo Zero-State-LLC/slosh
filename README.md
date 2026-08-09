@@ -51,7 +51,9 @@ The iPhone app is the discovery/configuration surface. It browses the same three
 reviewed Places as a list or geographic MapKit map, opens the shared status and
 provenance detail, and changes the worn Place only after an explicit **Wear this
 water** action. Map pins are canonical water bodies, not NOAA or USGS stations.
-Arbitrary geographic discovery is not implemented.
+Arbitrary geographic discovery is not implemented. Research-only NOAA CO-OPS
+and USGS metadata adapters can now produce portable observation candidates and
+raw evidence, but they never create product Places or appear in normal UI.
 
 ## Status
 
