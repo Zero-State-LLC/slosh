@@ -172,6 +172,41 @@ private actor FixedProvider: HydroStateProvider {
     func count() -> Int { fetchCount }
 }
 
+/// Blocks until released, so a second caller genuinely overlaps the first.
+private actor GatedProvider: HydroStateProvider {
+    private let state: HydroState
+    private var released = false
+    private(set) var fetchCount = 0
+
+    init(state: HydroState) {
+        self.state = state
+    }
+
+    func release() { released = true }
+
+    func fetch(_ waterBody: WaterBody) async throws -> HydroState {
+        fetchCount += 1
+        while !released {
+            try await Task.sleep(nanoseconds: 5_000_000)
+        }
+        return state
+    }
+
+    func count() -> Int { fetchCount }
+}
+
+/// Always cancels the way the network does, and counts how often it is asked.
+private actor AlwaysCancellingProvider: HydroStateProvider {
+    private(set) var fetchCount = 0
+
+    func fetch(_ waterBody: WaterBody) async throws -> HydroState {
+        fetchCount += 1
+        throw URLError(.cancelled)
+    }
+
+    func count() -> Int { fetchCount }
+}
+
 private actor URLCancelledThenSuccessProvider: HydroStateProvider {
     private let state: HydroState
     private var canceledOnce = false
@@ -850,6 +885,74 @@ if CommandLine.arguments.contains("--live") {
         Check.expect(false, "live provider metadata smoke test succeeded: \(error)")
     }
 }
+
+print("\nRefresh coalescing and retry floor")
+
+// Two callers arriving together — the view's .task and a complication refresh —
+// must not have one of them told "unavailable" by the throttle the other just
+// armed. Previously the loser got .unavailable on a cold cache.
+private let gated = GatedProvider(state: stateA)
+private let gatedCoordinator = LiveHydroCoordinator(provider: gated)
+private let firstCaller = Task {
+    await gatedCoordinator.refresh(waterBody: bayA, referenceDate: retrievedAt)
+}
+try await Task.sleep(nanoseconds: 30_000_000)
+private let secondCaller = Task {
+    await gatedCoordinator.refresh(
+        waterBody: bayA, referenceDate: retrievedAt.addingTimeInterval(0.2)
+    )
+}
+try await Task.sleep(nanoseconds: 30_000_000)
+await gated.release()
+private let firstOutcome = await firstCaller.value
+private let secondOutcome = await secondCaller.value
+
+if case .updated = firstOutcome { Check.expect(true, "the originating caller is updated") }
+else { Check.expect(false, "the originating caller is updated") }
+if case .updated = secondOutcome {
+    Check.expect(true, "a concurrent caller joins the fetch instead of being told unavailable")
+} else {
+    Check.expect(false, "a concurrent caller joins the fetch instead of being told unavailable")
+}
+private let gatedFetches = await gated.count()
+Check.expect(gatedFetches == 1, "two concurrent callers produce one provider fetch, not two")
+
+// Clearing the throttle on cancellation was correct in intent but had no floor,
+// so a wrist raise-and-lower cycle could drive an unbounded request rate.
+private let hammered = AlwaysCancellingProvider()
+private let hammeredCoordinator = LiveHydroCoordinator(provider: hammered)
+for tick in 0..<50 {
+    _ = await hammeredCoordinator.refresh(
+        waterBody: bayA,
+        referenceDate: retrievedAt.addingTimeInterval(Double(tick) * 0.2)
+    )
+}
+private let hammeredFetches = await hammered.count()
+Check.expect(
+    hammeredFetches <= 4,
+    "50 refreshes across 10 seconds of cancellations back off to a handful, not 50 (got \(hammeredFetches))"
+)
+Check.expect(
+    hammeredFetches >= 2,
+    "the first cancellation still retries immediately (got \(hammeredFetches))"
+)
+
+// The floor must expire, or a cancelled attempt would be as punishing as a
+// successful one.
+_ = await hammeredCoordinator.refresh(
+    waterBody: bayA,
+    // The loop above already advanced to +9.8s, so clear both it and the floor.
+    referenceDate: retrievedAt.addingTimeInterval(20)
+)
+private let afterFloor = await hammered.count()
+Check.expect(
+    afterFloor > hammeredFetches,
+    "a repeatedly cancelled place retries again once the backoff passes"
+)
+Check.expect(
+    LiveHydroCoordinator.minimumRetryInterval < LiveHydroCoordinator.minimumRefreshInterval,
+    "the cancellation floor is shorter than the ordinary refresh window"
+)
 
 print("\n────────────────────────────────────────────────────")
 if Check.failures == 0 {
