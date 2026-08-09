@@ -172,10 +172,15 @@ relevant product foundation is sound.
   against an immutable authored theme and reach the existing packed shader
   uniforms. Debug simulator fixtures provide calm/active/severe comparison on
   one Calm ocean base without adding shader uniforms.
-- **Still planned:** connect a real San Francisco Bay observation source. No live
-  provider or place data exists yet.
-- Add the first curated place using NOAA CO-OPS, then USGS Water Data where it
-  contributes a distinct measurement. Use NOAA ERDDAP only as needed.
+- **RW2B live debug vertical slice complete:** the curated San Francisco Bay
+  entry combines NOAA CO-OPS water level, wind, and air pressure from `9414290`
+  with observed currents from `s09010` bin 2. Provider networking and DTOs stay
+  in `HydroProviders`; partial data and network failure preserve authored water.
+- **Still planned:** RW2C / RW3 foundation for a deliberately small curated
+  WaterBody catalog and explicit coverage model. General Places UX and automatic
+  discovery do not exist yet.
+- Add USGS Water Data only where it contributes a distinct measurement. Use NOAA
+  ERDDAP only as needed.
 - Prove the complete observation-to-render path before generalizing discovery.
 
 ### RW3 — Curated Places catalog

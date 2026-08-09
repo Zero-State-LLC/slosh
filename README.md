@@ -36,11 +36,12 @@ built, rejected and thrown away.
 
 ## Future direction: Real Water
 
-Slosh currently contains authored water **Experiences**. The planned Real Water
-system adds **Places**, where selected geographic bodies of water can drive
-Slosh from accessible environmental observations. Live geographic data is not
-implemented yet; see [docs/REAL_WATER.md](docs/REAL_WATER.md) for the boundary
-and provenance rules.
+Slosh contains authored water **Experiences**. An experimental DEBUG simulator
+vertical slice now adds one Real Water **Place**: San Francisco Bay, driven by
+public NOAA CO-OPS water-level, wind, pressure, and current observations through
+the provider-independent Hydro pipeline. This is an integration harness, not
+general geographic support or a Places UI; see
+[docs/REAL_WATER.md](docs/REAL_WATER.md) for coverage and provenance rules.
 
 ## Status
 
@@ -74,9 +75,12 @@ xcodebuild -downloadPlatform watchOS
 
 ```
 OceanCore/                  Swift package — builds and tests without Xcode
-  Sources/OceanCore/          motion, modes, no UI framework at all
-  Sources/OceanUI/            the shader, the SpriteKit scene, particles
-  Sources/oceancheck/         test suite (a plain executable — see below)
+  Sources/OceanCore/          motion, modes, Hydro domain, no UI framework
+  Sources/HydroProviders/      NOAA transport and provider-local adapters
+  Sources/OceanUI/             the shader, the SpriteKit scene, particles
+  Sources/oceancheck/          existing water behavior checks
+  Sources/hydrocheck/          deterministic Hydro translation checks
+  Sources/providercheck/       offline NOAA fixtures and optional live smoke test
 Slosh/                      the watchOS app
 docs/                       architecture, modes, decisions, economics, roadmap
 media/                      captures used by the docs
@@ -89,8 +93,14 @@ watchOS, iOS and macOS.
 ## Testing
 
 ```bash
-cd OceanCore && swift run oceancheck
+cd OceanCore
+swift run oceancheck
+swift run hydrocheck
+swift run providercheck
 ```
+
+The provider suite is offline by default. `swift run providercheck --live` adds
+an observational, non-deterministic NOAA smoke test.
 
 340 assertions over flow direction, surge, ripples, rain, lightning, the bowl
 centre and the mode catalogue.

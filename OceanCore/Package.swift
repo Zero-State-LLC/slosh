@@ -7,6 +7,7 @@ let package = Package(
     products: [
         .library(name: "OceanCore", targets: ["OceanCore"]),
         .library(name: "OceanUI", targets: ["OceanUI"]),
+        .library(name: "HydroProviders", targets: ["HydroProviders"]),
     ],
     targets: [
         // Motion handling and themes. No UI framework, so it runs anywhere.
@@ -17,9 +18,18 @@ let package = Package(
         // Metal and SwiftUI's colorEffect are both unavailable there.
         .target(name: "OceanUI", dependencies: ["OceanCore"]),
 
+        // Provider transport and adapters. URLSession, NOAA URLs, and NOAA DTOs
+        // stop here and never enter the portable OceanCore target.
+        .target(name: "HydroProviders", dependencies: ["OceanCore"]),
+
         // Test suite as a plain executable rather than XCTest: it runs from
         // the command line with only the Swift toolchain installed.
         .executableTarget(name: "oceancheck", dependencies: ["OceanCore"]),
         .executableTarget(name: "hydrocheck", dependencies: ["OceanCore"]),
+        .executableTarget(
+            name: "providercheck",
+            dependencies: ["OceanCore", "HydroProviders"],
+            resources: [.process("Fixtures")]
+        ),
     ]
 )

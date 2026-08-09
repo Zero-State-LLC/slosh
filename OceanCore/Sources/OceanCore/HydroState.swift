@@ -51,6 +51,9 @@ public struct HydroMeasurement: Sendable, Equatable {
     public var origin: HydroOrigin
     public var quality: HydroQuality
     public var sourceID: String
+    /// Provider observation time when products in one state were not sampled
+    /// simultaneously. `HydroState.observedAt` remains the conservative summary.
+    public var observedAt: Date?
     /// Required for directional measurements. The interpreter converts both
     /// conventions to canonical direction-of-forcing-toward radians.
     public var directionConvention: HydroDirectionConvention?
@@ -61,6 +64,7 @@ public struct HydroMeasurement: Sendable, Equatable {
         origin: HydroOrigin,
         quality: HydroQuality,
         sourceID: String,
+        observedAt: Date? = nil,
         directionConvention: HydroDirectionConvention? = nil
     ) {
         self.value = value
@@ -68,6 +72,7 @@ public struct HydroMeasurement: Sendable, Equatable {
         self.origin = origin
         self.quality = quality
         self.sourceID = sourceID
+        self.observedAt = observedAt
         self.directionConvention = directionConvention
     }
 }

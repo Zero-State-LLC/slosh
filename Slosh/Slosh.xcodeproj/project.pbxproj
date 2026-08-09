@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		0100000000000000000000B3 /* OceanCore in Frameworks */ = {isa = PBXBuildFile; productRef = 0100000000000000000000B1 /* OceanCore */; };
 		0100000000000000000000B4 /* OceanUI in Frameworks */ = {isa = PBXBuildFile; productRef = 0100000000000000000000B2 /* OceanUI */; };
+		0100000000000000000000B6 /* HydroProviders in Frameworks */ = {isa = PBXBuildFile; productRef = 0100000000000000000000B5 /* HydroProviders */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -26,6 +27,7 @@
 			files = (
 				0100000000000000000000B3 /* OceanCore in Frameworks */,
 				0100000000000000000000B4 /* OceanUI in Frameworks */,
+				0100000000000000000000B6 /* HydroProviders in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -70,6 +72,7 @@
 			packageProductDependencies = (
 				0100000000000000000000B1 /* OceanCore */,
 				0100000000000000000000B2 /* OceanUI */,
+				0100000000000000000000B5 /* HydroProviders */,
 			);
 			productName = "Slosh Watch App";
 			productReference = 0100000000000000000000A5 /* Slosh.app */;
@@ -296,6 +299,10 @@
 		0100000000000000000000B2 /* OceanUI */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = OceanUI;
+		};
+		0100000000000000000000B5 /* HydroProviders */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = HydroProviders;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

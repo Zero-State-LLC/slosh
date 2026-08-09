@@ -1,0 +1,126 @@
+import Foundation
+import OceanCore
+
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
+
+public enum NOAAHydroAggregator {
+    public static func state(
+        samples: [NOAAProductSample],
+        retrievedAt: Date
+    ) throws -> HydroState {
+        let usable = samples.filter(\.hasMeasurement)
+        guard let observedAt = usable.map(\.observedAt).min() else {
+            throw NOAAProviderError.noUsableMeasurements
+        }
+
+        var state = HydroState(observedAt: observedAt, retrievedAt: retrievedAt)
+        for sample in usable {
+            state.waterLevel = state.waterLevel ?? sample.waterLevel
+            state.waterTemperature = state.waterTemperature ?? sample.waterTemperature
+            state.currentSpeed = state.currentSpeed ?? sample.currentSpeed
+            state.currentDirection = state.currentDirection ?? sample.currentDirection
+            state.windSpeed = state.windSpeed ?? sample.windSpeed
+            state.windDirection = state.windDirection ?? sample.windDirection
+            state.pressure = state.pressure ?? sample.pressure
+            state.salinity = state.salinity ?? sample.salinity
+        }
+        return state
+    }
+}
+
+public protocol HydroStateProvider: Sendable {
+    func fetch(_ waterBody: WaterBody) async throws -> HydroState
+}
+
+public protocol NOAADataTransport: Sendable {
+    func data(from url: URL) async throws -> Data
+}
+
+public struct URLSessionNOAATransport: NOAADataTransport, @unchecked Sendable {
+    private let session: URLSession
+
+    public init(session: URLSession = .shared) {
+        self.session = session
+    }
+
+    public func data(from url: URL) async throws -> Data {
+        let (data, response) = try await session.data(from: url)
+        guard let response = response as? HTTPURLResponse else {
+            throw NOAAProviderError.malformedResponse
+        }
+        guard (200..<300).contains(response.statusCode) else {
+            throw NOAAProviderError.httpStatus(response.statusCode)
+        }
+        return data
+    }
+}
+
+public struct NOAACOOPSProvider<Transport: NOAADataTransport>: HydroStateProvider, Sendable {
+    public let transport: Transport
+
+    public init(transport: Transport) {
+        self.transport = transport
+    }
+
+    public func fetch(_ waterBody: WaterBody) async throws -> HydroState {
+        var samples: [NOAAProductSample] = []
+        var sawCancellation = false
+
+        for request in requests(for: waterBody) {
+            do {
+                guard let url = request.url else { throw NOAAProviderError.invalidRequest }
+                let data = try await transport.data(from: url)
+                let sample = try NOAAHydroAdapter.decode(
+                    data, product: request.product, stationID: request.stationID
+                )
+                if sample.hasMeasurement { samples.append(sample) }
+            } catch is CancellationError {
+                sawCancellation = true
+                break
+            } catch {
+                // Partial product coverage is normal. Individual failures stay
+                // absent; only an entirely empty aggregate fails below.
+                continue
+            }
+        }
+        if sawCancellation { throw CancellationError() }
+        return try NOAAHydroAggregator.state(samples: samples, retrievedAt: Date())
+    }
+
+    public func requests(for waterBody: WaterBody) -> [NOAARequest] {
+        var result: [NOAARequest] = []
+        for binding in waterBody.sourceBindings {
+            switch binding {
+            case let .noaaCOOPSStation(stationID, capabilities):
+                if capabilities.contains(.waterLevel) {
+                    result.append(NOAARequest(stationID: stationID, product: .waterLevel))
+                }
+                if capabilities.contains(.waterTemperature) {
+                    result.append(NOAARequest(stationID: stationID, product: .waterTemperature))
+                }
+                if capabilities.contains(.wind) {
+                    result.append(NOAARequest(stationID: stationID, product: .wind))
+                }
+                if capabilities.contains(.airPressure) {
+                    result.append(NOAARequest(stationID: stationID, product: .airPressure))
+                }
+                if capabilities.contains(.salinity) {
+                    result.append(NOAARequest(stationID: stationID, product: .salinity))
+                }
+            case let .noaaCOOPSCurrentStation(stationID, bin):
+                result.append(NOAARequest(stationID: stationID, product: .currents, bin: bin))
+            }
+        }
+        return result
+    }
+}
+
+public typealias LiveNOAACOOPSProvider = NOAACOOPSProvider<URLSessionNOAATransport>
+
+public extension NOAACOOPSProvider where Transport == URLSessionNOAATransport {
+    init() {
+        self.init(transport: URLSessionNOAATransport())
+    }
+}
