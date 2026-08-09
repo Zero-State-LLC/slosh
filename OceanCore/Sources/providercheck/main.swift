@@ -83,6 +83,50 @@ private actor FixedProvider: HydroStateProvider {
     func count() -> Int { fetchCount }
 }
 
+/// A transport that fails the way `URLSession` actually fails when its task is
+/// cancelled: `URLError(.cancelled)`, **not** `CancellationError`.
+///
+/// This distinction is the whole point of the fake. A fake that cancels via
+/// `Task.sleep` throws `CancellationError` and so exercises a path no live
+/// transport can take, which is how the original cancellation defect passed a
+/// green suite.
+private actor URLCancellingNOAATransport: NOAADataTransport {
+    private var calls = 0
+    private let succeedFirst: Int
+    private let payload: Data
+
+    init(succeedFirst: Int, payload: Data) {
+        self.succeedFirst = succeedFirst
+        self.payload = payload
+    }
+
+    func data(from url: URL) async throws -> Data {
+        calls += 1
+        if calls > succeedFirst { throw URLError(.cancelled) }
+        return payload
+    }
+
+    func count() -> Int { calls }
+}
+
+/// Cancels the first fetch the way the network does, then succeeds.
+private actor URLCancelThenSucceedProvider: HydroStateProvider {
+    private let state: HydroState
+    private(set) var fetchCount = 0
+
+    init(state: HydroState) {
+        self.state = state
+    }
+
+    func fetch(_ waterBody: WaterBody) async throws -> HydroState {
+        fetchCount += 1
+        if fetchCount == 1 { throw URLError(.cancelled) }
+        return state
+    }
+
+    func count() -> Int { fetchCount }
+}
+
 actor CancellationThenSuccessProvider: HydroStateProvider {
     private let canceledWaterBodyID: WaterBody.ID
     private let states: [WaterBody.ID: HydroState]
@@ -498,6 +542,71 @@ let bAfterACancellation = await cancellationCoordinator.refresh(
 if case let .preserved(preservedState, _) = bAfterACancellation {
     Check.expect(preservedState == stateB, "canceling A does not mutate B refresh record")
 } else { Check.expect(false, "canceling A does not mutate B refresh record") }
+
+// Cancellation as the network reports it. Everything above cancels via
+// Task.sleep, which throws CancellationError — a path no live transport takes.
+print("\nCancellation via URLError")
+
+private let cancellingTransport = URLCancellingNOAATransport(
+    succeedFirst: 1, payload: try fixture("valid-water-level")
+)
+private let cancellingProvider = NOAACOOPSProvider(transport: cancellingTransport)
+let cancellingRequestCount = cancellingProvider.requests(for: bay).count
+Check.expect(cancellingRequestCount > 1, "the fixture place issues more than one request")
+do {
+    _ = try await cancellingProvider.fetch(bay)
+    Check.expect(false, "a cancelled transport must not yield a state")
+} catch {
+    Check.expect(
+        error is CancellationError,
+        "URLError(.cancelled) is reported as cancellation, not as a partial result"
+    )
+}
+let attempted = await cancellingTransport.count()
+Check.expect(
+    attempted == 2,
+    "cancellation stops the request loop (attempted \(attempted) of \(cancellingRequestCount))"
+)
+
+private let urlCancelProvider = URLCancelThenSucceedProvider(state: stateA)
+let urlCancelCoordinator = LiveHydroCoordinator(provider: urlCancelProvider)
+let urlFirst = await urlCancelCoordinator.refresh(waterBody: bayA, referenceDate: retrievedAt)
+Check.expect(
+    urlFirst == .unavailable,
+    "a cancelled refresh with nothing cached stays unavailable"
+)
+let urlRetry = await urlCancelCoordinator.refresh(
+    waterBody: bayA,
+    referenceDate: retrievedAt.addingTimeInterval(1)
+)
+if case .updated = urlRetry {
+    Check.expect(true, "URLError cancellation does not throttle the next activation")
+} else {
+    Check.expect(false, "URLError cancellation does not throttle the next activation")
+}
+let urlCancelFetches = await urlCancelProvider.count()
+Check.expect(
+    urlCancelFetches == 2,
+    "next activation reaches the provider after a URLError cancellation"
+)
+
+// A routed child that cancels must not be merged in as an ordinary outage, or
+// a partial merge gets stored as the last known good state.
+let routedCancelling = RoutedHydroProvider(routes: [
+    HydroProviderRoute(
+        namespaces: [NOAACOOPSProvider<URLSessionNOAATransport>.stationNamespace],
+        provider: URLCancelThenSucceedProvider(state: stateA)
+    )
+])
+do {
+    _ = try await routedCancelling.fetch(bay)
+    Check.expect(false, "a routed child cancellation must not merge as an outage")
+} catch {
+    Check.expect(
+        error is CancellationError,
+        "routed provider reports a cancelled child as cancellation"
+    )
+}
 let cancellationFetchedIDs = await cancellationProvider.fetchedIDs()
 Check.expect(
     cancellationFetchedIDs == [bayB.id, bayA.id, bayA.id],

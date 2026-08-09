@@ -52,7 +52,16 @@ public struct RoutedHydroProvider: HydroStateProvider, Sendable {
             return values.sorted { $0.0 < $1.0 }
         }
 
+        // A route that reports cancellation counts even if this task was not
+        // itself marked cancelled — a child cancelled by its own transport
+        // would otherwise be merged in as an ordinary outage, and a partial
+        // merge would be stored as the last known good state.
         if Task.isCancelled { throw CancellationError() }
+        for (_, result) in results {
+            if case let .failure(error) = result, isHydroCancellation(error) {
+                throw CancellationError()
+            }
+        }
         let states = results.compactMap { try? $0.1.get() }
         guard !states.isEmpty else { throw RoutedHydroProviderError.noUsableMeasurements }
         return try HydroStateMerger.merge(states)
