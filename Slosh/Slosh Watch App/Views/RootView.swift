@@ -130,7 +130,8 @@ struct RootView: View {
                 selectedThemeID: $themeID,
                 selectedPlaceID: $placeID,
                 hapticsEnabled: $hapticsEnabled,
-                realWaterLoadState: realWaterLoadState
+                realWaterLoadState: realWaterLoadState,
+                haptics: model.haptics
             )
         }
         .onAppear {
@@ -146,8 +147,10 @@ struct RootView: View {
                 physicalValidationDiagnostics.haptic(kind: kind, fired: fired, reason: reason)
             }
             #endif
-            model.startRunning()
-            activateRealWater()
+            if !showingPicker {
+                model.startRunning()
+                activateRealWater()
+            }
         }
         .onDisappear {
             #if DEBUG
@@ -168,7 +171,7 @@ struct RootView: View {
             realWaterLoadState = activeWaterBody.map {
                 .loading($0.id)
             } ?? .inactive
-            if scenePhase == .active, !isLuminanceReduced { activateRealWater() }
+            if scenePhase == .active, !isLuminanceReduced, !showingPicker { activateRealWater() }
         }
         .onChange(of: crownEnergy) { _, newValue in
             model.apply(energy: newValue)
@@ -179,7 +182,7 @@ struct RootView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             // Nothing runs unless the app is frontmost and the screen is lit.
-            if phase == .active, !isLuminanceReduced {
+            if phase == .active, !isLuminanceReduced, !showingPicker {
                 #if DEBUG
                 physicalValidationDiagnostics.lifecycle("foreground-bright")
                 #endif
@@ -200,9 +203,23 @@ struct RootView: View {
                 #endif
                 deactivateRealWater()
                 model.stopRunning()
-            } else if scenePhase == .active {
+            } else if scenePhase == .active, !showingPicker {
                 #if DEBUG
                 physicalValidationDiagnostics.lifecycle("luminance-restored")
+                #endif
+                model.startRunning()
+                activateRealWater()
+            }
+        }
+        .onChange(of: showingPicker) { _, visible in
+            if visible {
+                #if DEBUG
+                physicalValidationDiagnostics.lifecycle("picker-visible")
+                #endif
+                model.stopRunning()
+            } else if scenePhase == .active, !isLuminanceReduced {
+                #if DEBUG
+                physicalValidationDiagnostics.lifecycle("picker-hidden")
                 #endif
                 model.startRunning()
                 activateRealWater()

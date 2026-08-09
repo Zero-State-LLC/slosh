@@ -160,6 +160,10 @@ public final class WaterScene: SKScene {
         let dt = min(max(currentTime - last, 0), 1.0 / 20.0)
         guard dt > 0 else { return }
 
+        if let driftingMotion = motionSource as? DriftingMotion {
+            driftingMotion.advance(dt: dt)
+        }
+
         driver.advance(dt: dt, motion: motionSource.current)
 
         if onDiagnostics != nil,
