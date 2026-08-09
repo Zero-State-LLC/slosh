@@ -23,8 +23,20 @@ public enum HydroFixtures {
         waterLevel: 2.4, temperature: 9, pressure: 975, salinity: 25
     )
 
-    private static func measurement(_ value: Double, _ unit: HydroUnit, _ id: String) -> HydroMeasurement {
-        HydroMeasurement(value: value, unit: unit, origin: .observed, quality: .good, sourceID: id)
+    private static func measurement(
+        _ value: Double,
+        _ unit: HydroUnit,
+        _ id: String,
+        directionConvention: HydroDirectionConvention? = nil
+    ) -> HydroMeasurement {
+        HydroMeasurement(
+            value: value,
+            unit: unit,
+            origin: .observed,
+            quality: .good,
+            sourceID: id,
+            directionConvention: directionConvention
+        )
     }
 
     private static func state(
@@ -38,11 +50,17 @@ public enum HydroFixtures {
             waterLevel: measurement(waterLevel, .meters, "fixture.water-level"),
             waterTemperature: measurement(temperature, .celsius, "fixture.temperature"),
             currentSpeed: measurement(currentSpeed, .metersPerSecond, "fixture.current-speed"),
-            currentDirection: measurement(currentDirection, .degreesTrue, "fixture.current-direction"),
+            currentDirection: measurement(
+                currentDirection, .degreesTrue, "fixture.current-direction",
+                directionConvention: .toward
+            ),
             waveHeight: measurement(waveHeight, .meters, "fixture.wave-height"),
             wavePeriod: measurement(wavePeriod, .seconds, "fixture.wave-period"),
             windSpeed: measurement(windSpeed, .metersPerSecond, "fixture.wind-speed"),
-            windDirection: measurement(windDirection, .degreesTrue, "fixture.wind-direction"),
+            windDirection: measurement(
+                windDirection, .degreesTrue, "fixture.wind-direction",
+                directionConvention: .from
+            ),
             pressure: measurement(pressure, .hectopascals, "fixture.pressure"),
             salinity: measurement(salinity, .practicalSalinityUnits, "fixture.salinity")
         )

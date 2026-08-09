@@ -6,6 +6,7 @@ public struct HydroInterpreter: Sendable {
     public enum FreshnessThresholds {
         public static let live: TimeInterval = 15 * 60
         public static let recent: TimeInterval = 60 * 60
+        public static let maxFutureClockSkew: TimeInterval = 5 * 60
     }
 
     public init() {}
@@ -60,6 +61,9 @@ public struct HydroInterpreter: Sendable {
 
     public func freshness(of state: HydroState, referenceDate: Date) -> HydroFreshness {
         guard hasUsableMeasurement(state) else { return .unavailable }
+        guard state.observedAt <= referenceDate.addingTimeInterval(
+            FreshnessThresholds.maxFutureClockSkew
+        ) else { return .unavailable }
         let age = max(0, referenceDate.timeIntervalSince(state.observedAt))
         if age <= FreshnessThresholds.live { return .live }
         if age <= FreshnessThresholds.recent { return .recent }
@@ -67,27 +71,29 @@ public struct HydroInterpreter: Sendable {
     }
 
     private func normalized(_ measurement: HydroMeasurement?, unit: HydroUnit, maximum: Double) -> Double? {
-        guard let measurement, measurement.unit == unit, measurement.value.isFinite else { return nil }
+        guard isUsable(measurement, unit: unit) else { return nil }
+        guard let measurement else { return nil }
         return clamp(measurement.value / maximum)
     }
 
     private func normalizedMagnitude(
         _ measurement: HydroMeasurement?, unit: HydroUnit, maximum: Double
     ) -> Double {
-        guard let measurement, measurement.unit == unit, measurement.value.isFinite else { return 0 }
+        guard isUsable(measurement, unit: unit), let measurement else { return 0 }
         return clamp(abs(measurement.value) / maximum)
     }
 
     private func normalizedDeviation(
         _ measurement: HydroMeasurement?, unit: HydroUnit, center: Double, span: Double
     ) -> Double {
-        guard let measurement, measurement.unit == unit, measurement.value.isFinite else { return 0 }
+        guard isUsable(measurement, unit: unit), let measurement else { return 0 }
         return clamp(abs(measurement.value - center) / span)
     }
 
     private func waveRate(_ measurement: HydroMeasurement?) -> Double? {
         guard let measurement,
               measurement.unit == .seconds,
+              measurement.quality != .suspect,
               measurement.value.isFinite,
               measurement.value > 0 else { return nil }
         // Short periods read as faster water. Twenty seconds and above settle at
@@ -98,8 +104,11 @@ public struct HydroInterpreter: Sendable {
     private func direction(_ measurement: HydroMeasurement?) -> Double? {
         guard let measurement,
               measurement.unit == .degreesTrue,
-              measurement.value.isFinite else { return nil }
-        let degrees = measurement.value.truncatingRemainder(dividingBy: 360)
+              measurement.quality != .suspect,
+              measurement.value.isFinite,
+              let convention = measurement.directionConvention else { return nil }
+        let towardDegrees = measurement.value + (convention == .from ? 180 : 0)
+        let degrees = towardDegrees.truncatingRemainder(dividingBy: 360)
         let positive = degrees < 0 ? degrees + 360 : degrees
         return positive * .pi / 180
     }
@@ -118,8 +127,17 @@ public struct HydroInterpreter: Sendable {
             (state.salinity, .practicalSalinityUnits),
         ]
         return expected.contains { measurement, unit in
-            measurement?.unit == unit && measurement?.value.isFinite == true
+            isUsable(measurement, unit: unit)
         }
+    }
+
+    private func isUsable(_ measurement: HydroMeasurement?, unit: HydroUnit) -> Bool {
+        guard let measurement,
+              measurement.unit == unit,
+              measurement.quality != .suspect,
+              measurement.value.isFinite else { return false }
+        if unit == .degreesTrue { return measurement.directionConvention != nil }
+        return true
     }
 
     private func clamp(_ value: Double) -> Double {

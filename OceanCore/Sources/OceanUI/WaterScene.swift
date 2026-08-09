@@ -23,6 +23,12 @@ public final class WaterScene: SKScene {
         didSet { driver.energy = energy }
     }
 
+    /// Normalized persistent input only. HydroState and provider DTOs stay out
+    /// of the renderer boundary.
+    public var environmentalForcing: EnvironmentalForcing? {
+        didSet { driver.environmentalForcing = environmentalForcing }
+    }
+
     /// Set false when the app backgrounds or the screen dims — the scene keeps
     /// existing but stops costing anything.
     public var isRunning = true
@@ -133,7 +139,7 @@ public final class WaterScene: SKScene {
             Float(driver.centerX), Float(driver.centerY)
         )
         uniforms["u_state"]?.vectorFloat4Value = vector_float4(
-            Float(driver.energy), Float(driver.surge), Float(driver.flash), 0
+            Float(driver.resolvedEnergy), Float(driver.surge), Float(driver.flash), 0
         )
 
         for (index, name) in ["u_r0", "u_r1", "u_r2", "u_r3", "u_r4", "u_r5"].enumerated() {

@@ -19,6 +19,13 @@ public struct Ripple: Sendable, Equatable {
 /// ripple or a lightning strike happens. Keeping that here rather than in the
 /// scene means it is plain Swift and can be tested.
 public struct SurfaceDriver: Sendable {
+    public enum EnvironmentalBlendThresholds {
+        /// Below this in-plane gravity, the watch is treated as flat.
+        public static let gravityDeadZone = 0.12
+        /// At and above this magnitude, wrist direction has full authority.
+        public static let fullWristAuthority = 0.75
+    }
+
     /// Direction the swell travels, as an angle.
     ///
     /// Stored as an angle rather than a vector on purpose: interpolating a
@@ -46,6 +53,29 @@ public struct SurfaceDriver: Sendable {
 
     /// Crown-controlled liveliness, 0.3…2.
     public var energy: Double = 1.0
+
+    /// Persistent, normalized influence from a Hydro interpretation. `nil`
+    /// preserves the original authored-mode driver behavior exactly.
+    public var environmentalForcing: EnvironmentalForcing?
+
+    /// Environmental forcing is an additive baseline, never a replacement for
+    /// crown energy: E = crown + 0.65e + 0.15t + 0.10c + 0.10w, capped at 3.
+    public var resolvedEnergy: Double {
+        guard let forcing = usableEnvironmentalForcing else { return energy }
+        let crown = energy.isFinite ? max(0, energy) : 1
+        let baseline = 0.65 * forcing.energy
+            + 0.15 * forcing.turbulence
+            + 0.10 * forcing.flowStrength
+            + 0.10 * forcing.windStrength
+        return min(crown + baseline, 3)
+    }
+
+    /// Total current activity including shake-driven transient surge.
+    public var resolvedActivity: Double {
+        let value = resolvedEnergy + surge
+        guard value.isFinite else { return 0 }
+        return min(max(value, 0), 6)
+    }
 
     /// How hard this mode answers movement. Breaking surf is violent; rain
     /// barely notices.
@@ -94,20 +124,25 @@ public struct SurfaceDriver: Sendable {
         time += dt
 
         if followsGravity {
-            // Waves roll toward wherever gravity points. When the watch is flat
-            // there is no in-plane gravity, so the swell keeps its last heading
-            // instead of snapping to an arbitrary one.
             let gx = motion.gravityX
             let gy = motion.gravityY
             let magnitude = (gx * gx + gy * gy).squareRoot()
-            if magnitude > 0.12, magnitude.isFinite {
-                let target = atan2(gx / magnitude, -gy / magnitude)
-                // Turn the short way round, so the swell never spins most of a
-                // circle to reach a heading just next to the one it had.
-                var delta = (target - heading).truncatingRemainder(dividingBy: 2 * .pi)
-                if delta > .pi { delta -= 2 * .pi }
-                if delta < -.pi { delta += 2 * .pi }
-                heading += delta * (flowSmoothing * dt).clamped(to: 0...1)
+            let wristDirection = magnitude > EnvironmentalBlendThresholds.gravityDeadZone
+                && magnitude.isFinite
+                ? atan2(gx / magnitude, -gy / magnitude)
+                : nil
+
+            if let ambient = usableEnvironmentalForcing?.flowDirection {
+                // Flat means ambient authority. As tilt grows, the target moves
+                // along the shortest angular path until the wrist owns it.
+                let wristWeight = wristAuthority(forGravityMagnitude: magnitude)
+                let target = wristDirection.map {
+                    angle(from: ambient, toward: $0, fraction: wristWeight)
+                } ?? ambient
+                turnHeading(toward: target, dt: dt)
+            } else if let wristDirection {
+                // Original behavior when no environmental direction is present.
+                turnHeading(toward: wristDirection, dt: dt)
             }
         } else {
             // No down to find, so the swell simply wanders. Two incommensurate
@@ -205,7 +240,9 @@ public struct SurfaceDriver: Sendable {
 
     public mutating func ripple(atX x: Double, y: Double, strength: Double = 1.0) {
         guard x.isFinite, y.isFinite, strength > 0 else { return }
-        ripples[nextSlot] = Ripple(x: x, y: y, birth: time, strength: strength * energy)
+        ripples[nextSlot] = Ripple(
+            x: x, y: y, birth: time, strength: strength * resolvedEnergy
+        )
         nextSlot = (nextSlot + 1) % ripples.count
     }
 
@@ -240,6 +277,36 @@ public struct SurfaceDriver: Sendable {
         rainRate = theme.rainRate
         lightningInterval = theme.lightningInterval
         followsGravity = theme.followsGravity
+    }
+
+    private var usableEnvironmentalForcing: EnvironmentalForcing? {
+        guard let environmentalForcing,
+              environmentalForcing.freshness != .unavailable else { return nil }
+        return environmentalForcing
+    }
+
+    private func wristAuthority(forGravityMagnitude magnitude: Double) -> Double {
+        guard magnitude.isFinite else { return 0 }
+        let span = EnvironmentalBlendThresholds.fullWristAuthority
+            - EnvironmentalBlendThresholds.gravityDeadZone
+        return ((magnitude - EnvironmentalBlendThresholds.gravityDeadZone) / span)
+            .clamped(to: 0...1)
+    }
+
+    private func angle(from start: Double, toward end: Double, fraction: Double) -> Double {
+        start + shortestAngularDelta(from: start, to: end) * fraction.clamped(to: 0...1)
+    }
+
+    private func shortestAngularDelta(from start: Double, to end: Double) -> Double {
+        var delta = (end - start).truncatingRemainder(dividingBy: 2 * .pi)
+        if delta > .pi { delta -= 2 * .pi }
+        if delta < -.pi { delta += 2 * .pi }
+        return delta
+    }
+
+    private mutating func turnHeading(toward target: Double, dt: Double) {
+        heading += shortestAngularDelta(from: heading, to: target)
+            * (flowSmoothing * dt).clamped(to: 0...1)
     }
 }
 

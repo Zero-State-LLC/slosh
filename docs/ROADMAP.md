@@ -164,8 +164,12 @@ relevant product foundation is sound.
 
 ### RW2 — San Francisco Bay vertical slice
 
-- Integrate environmental forcing into `SurfaceDriver` while preserving wrist
-  interaction as transient forcing.
+- **RW2A foundation complete:** normalized environmental forcing integrates into
+  `SurfaceDriver` as a bounded persistent baseline; wrist gravity temporarily
+  owns direction, shake remains transient, direction conventions are canonical,
+  suspect measurements are ignored, and future clock skew is bounded.
+- **Still planned:** connect a real San Francisco Bay observation source. No live
+  provider or place data exists yet.
 - Add the first curated place using NOAA CO-OPS, then USGS Water Data where it
   contributes a distinct measurement. Use NOAA ERDDAP only as needed.
 - Prove the complete observation-to-render path before generalizing discovery.
