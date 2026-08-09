@@ -125,6 +125,32 @@ actor ProductPayloadNOAATransport: NOAADataTransport {
     func products() -> [String] { requestedProducts }
 }
 
+actor PerProductNOAATransport: NOAADataTransport {
+    private let payloads: [String: Data]
+    private let failures: [String: Error]
+    private(set) var requestedProducts: [String] = []
+
+    init(payloads: [String: Data], failures: [String: Error]) {
+        self.payloads = payloads
+        self.failures = failures
+    }
+
+    func data(from url: URL) async throws -> Data {
+        let product = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?
+            .first(where: { $0.name == "product" })?
+            .value ?? ""
+        requestedProducts.append(product)
+        if let failure = failures[product] { throw failure }
+        guard let payload = payloads[product] else {
+            throw NOAAProviderError.noUsableMeasurements
+        }
+        return payload
+    }
+
+    func products() -> [String] { requestedProducts }
+}
+
 private actor ConcurrentNOAATransport: NOAADataTransport {
     private let payloads: [String: Data]
     private var activeRequests = 0
@@ -687,6 +713,44 @@ do {
     if case .providerMessage = error { terminalNoaaError = true }
 }
 Check.expect(terminalNoaaError, "all NOAA failures for one body surface provider-message as a terminal error")
+
+let mixedFailureTransport = PerProductNOAATransport(
+    payloads: noaaPayloads,
+    failures: [
+        "wind": NOAAProviderError.providerMessage("No data was found. This product may not be offered at this station at the requested time."),
+        "currents": CancellationError()
+    ]
+)
+let mixedFailureNoaaBody = WaterBody(
+    id: "mixed-failure-noaa",
+    name: "Mixed Failure NOAA",
+    region: "Deterministic test",
+    latitude: WaterBodies.sanFranciscoBay.latitude,
+    longitude: WaterBodies.sanFranciscoBay.longitude,
+    kind: .bay,
+    sourceBindings: [
+        HydroSourceBinding(
+            namespace: NOAACOOPSProvider<URLSessionNOAATransport>.stationNamespace,
+            sourceID: "9414290",
+            capabilities: [.waterLevel, .wind]
+        ),
+        HydroSourceBinding(
+            namespace: NOAACOOPSProvider<URLSessionNOAATransport>.currentStationNamespace,
+            sourceID: "s10010",
+            capabilities: [.currentSpeed, .currentDirection],
+            parameters: ["bin": "2"]
+        ),
+    ]
+)
+let mixedFailureNoaaProvider = NOAACOOPSProvider(transport: mixedFailureTransport)
+do {
+    _ = try await mixedFailureNoaaProvider.fetch(mixedFailureNoaaBody)
+    Check.expect(false, "mixed NOAA failures prefer cancellation over provider-message")
+} catch is CancellationError {
+    Check.expect(true, "mixed NOAA failures prefer cancellation over provider-message")
+} catch {
+    Check.expect(false, "mixed NOAA failures prefer cancellation over provider-message: \(error)")
+}
 
 var timestampWasRejected = false
 do {

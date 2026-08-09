@@ -105,19 +105,8 @@ public enum NOAAHydroAdapter {
         product: NOAAProduct = .waterLevel
     ) -> HydroQuality {
         guard let flags, !flags.isEmpty else { return .unknown }
-        let values = flags.split(separator: ",", omittingEmptySubsequences: false)
-
-        let relevantFlags: ArraySlice<Substring>
-        switch product {
-        case .waterLevel:
-            // Water level's first flag is a sample-count; only the remaining
-            // flags are booleans.
-            relevantFlags = values.dropFirst()
-        case .currents, .salinity:
-            relevantFlags = []
-        default:
-            relevantFlags = values[...]
-        }
+        let values = Array(flags.split(separator: ",", omittingEmptySubsequences: false))
+        let relevantFlags = relevantQualityFlags(for: product, in: values)
 
         if relevantFlags.contains(where: { $0.trimmingCharacters(in: .whitespaces) != "0" }) {
             return .suspect
@@ -126,6 +115,37 @@ public enum NOAAHydroAdapter {
             return .unknown
         }
         return .good
+    }
+
+    /// Product-specific interpretation of NOAA quality flags:
+    /// - waterLevel: first flag is sample-count and must be dropped.
+    /// - currents/salinity: CO-OPS payloads do not carry useful QC flags.
+    /// - all others: all flags are direct QC booleans.
+    private static let qualityFlagPolicy: [NOAAProduct: QualityFlagPolicy] = [
+        .waterLevel: .skipLeading(1),
+        .currents: .ignore,
+        .salinity: .ignore
+    ]
+
+    private enum QualityFlagPolicy {
+        case useAll
+        case skipLeading(Int)
+        case ignore
+    }
+
+    private static func relevantQualityFlags(
+        for product: NOAAProduct,
+        in values: [Substring]
+    ) -> ArraySlice<Substring> {
+        let policy = qualityFlagPolicy[product] ?? .useAll
+        switch policy {
+        case .useAll:
+            return values[...]
+        case let .skipLeading(count):
+            return values.dropFirst(count)
+        case .ignore:
+            return []
+        }
     }
 
     public static func parseTimestamp(_ value: String) -> Date? {
