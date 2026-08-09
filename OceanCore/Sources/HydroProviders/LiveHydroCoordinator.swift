@@ -4,6 +4,7 @@ import OceanCore
 public enum HydroRefreshOutcome: Sendable, Equatable {
     case updated(state: HydroState, experience: HydroExperience)
     case preserved(state: HydroState, experience: HydroExperience)
+    case failed(message: String)
     case unavailable
 }
 
@@ -131,7 +132,11 @@ public actor LiveHydroCoordinator {
                     records[waterBodyID] = record
                 }
             }
-            return preservedOrUnavailable(for: waterBodyID, referenceDate: referenceDate)
+            let preserved = preservedOrUnavailable(for: waterBodyID, referenceDate: referenceDate)
+            return switch preserved {
+            case .unavailable: .failed(message: failureMessage(for: error))
+            default: preserved
+            }
         }
     }
 
@@ -170,5 +175,20 @@ public actor LiveHydroCoordinator {
             state: state,
             experience: HydroInterpreter().interpret(state, referenceDate: referenceDate)
         )
+    }
+
+    private func failureMessage(for error: Error) -> String {
+        if let urlError = error as? URLError {
+            return switch urlError.code {
+            case .notConnectedToInternet: "No network"
+            case .timedOut: "Request timed out"
+            case .networkConnectionLost: "Network connection lost"
+            case .cannotConnectToHost: "Cannot reach observation host"
+            case .badServerResponse: "Bad server response"
+            case .cannotParseResponse: "Could not parse response"
+            default: "Live data unavailable"
+            }
+        }
+        return "Live data unavailable"
     }
 }

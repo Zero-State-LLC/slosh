@@ -38,6 +38,7 @@ public struct CuratedPlaceMapAnnotation: Identifiable, Sendable, Equatable {
         case .loading: "Loading"
         case let .loaded(status): HydroPresentationFormatter.freshness(status.freshness)
         case let .preserved(status): "Preserved · \(HydroPresentationFormatter.freshness(status.freshness))"
+        case let .failed(reason): reason
         case .unavailable: "Unavailable"
         }
     }

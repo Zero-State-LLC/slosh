@@ -98,6 +98,7 @@ public enum PlaceObservationLoadState: Sendable, Equatable {
     case loading
     case loaded(PlaceHydroStatus)
     case preserved(PlaceHydroStatus)
+    case failed(String)
     case unavailable
 }
 

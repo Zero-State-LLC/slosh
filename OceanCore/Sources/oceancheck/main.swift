@@ -605,13 +605,14 @@ Check.suite("iPhone Places selection foundation") {
         var store = PlaceObservationStore()
         store.beginLoading(WaterBodies.sanFranciscoBay.id)
         store.accept(.unavailable, for: WaterBodies.lakeTahoe.id)
+        store.accept(.failed("No network"), for: WaterBodies.montereyBay.id)
         let annotations = CuratedPlacesMapSnapshot(
             observations: store,
             selectedPlaceID: nil
         ).annotations
         Check.equal(annotations.first { $0.id == WaterBodies.sanFranciscoBay.id }?.statusText, "Loading")
         Check.equal(annotations.first { $0.id == WaterBodies.lakeTahoe.id }?.statusText, "Unavailable")
-        Check.equal(annotations.first { $0.id == WaterBodies.montereyBay.id }?.statusText, "Reviewed coverage")
+        Check.equal(annotations.first { $0.id == WaterBodies.montereyBay.id }?.statusText, "No network")
     }
 
     Check.test("map browsing does not change the worn Place") {

@@ -232,6 +232,7 @@ private struct PlaceRow: View {
         case .loading: "Loading observations…"
         case let .loaded(status): HydroPresentationFormatter.freshness(status.freshness)
         case .preserved: "Using last observation"
+        case let .failed(reason): reason
         case .unavailable: "Live data unavailable"
         }
     }
@@ -277,6 +278,7 @@ struct PlaceDetailView: View {
     private var status: PlaceHydroStatus? {
         switch state {
         case let .loaded(value), let .preserved(value): value
+        case .failed: nil
         default: nil
         }
     }
@@ -343,6 +345,8 @@ private struct CurrentStateView: View {
             Label(summary, systemImage: "dot.radiowaves.left.and.right")
         case .preserved:
             Label("Using last observation · \(summary)", systemImage: "clock.arrow.circlepath")
+        case .failed:
+            Label("Load failed", systemImage: "exclamationmark.triangle")
         case .unavailable:
             Label("Live data unavailable", systemImage: "wifi.slash")
         }
