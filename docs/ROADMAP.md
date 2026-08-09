@@ -247,10 +247,16 @@ relevant product foundation is sound.
   `needsReview`, unsupported `notComputable`, and JSON review artifacts. No live
   discovery or product UI exists. See
   [RW4C_GEOGRAPHIC_DISCOVERY_RESEARCH.md](RW4C_GEOGRAPHIC_DISCOVERY_RESEARCH.md).
-- **Next: RW4E — Provider Metadata Candidate Adapters.** Add DEBUG/research-only
-  NOAA CO-OPS and USGS metadata adapters that return observation candidates and
-  raw evidence, never automatic `WaterBody` values. Keep geographic feature
-  resolution fixture-backed until an authoritative query/index is selected.
+- **RW4E complete:** research-only NOAA CO-OPS MDAPI and USGS Water Data OGC
+  adapters return sorted provider-independent observation candidates and explicit
+  evidence. Proximity, site class, and HUC remain evidence rather than identity;
+  product capabilities are never inferred from location metadata. The adapters
+  create no `WaterBody`, add no catalog entry, and have no product UI wiring.
+- **Next: RW4F — Authoritative Geographic Feature Resolver Prototype.** Evaluate
+  one bounded, reproducible feature-query/index approach for inland water-body
+  identity and containment. Compose its feature evidence with RW4E candidates in
+  research tooling only; preserve `needsReview` and `notComputable`, and do not
+  expose arbitrary map selection yet.
 
 ### RW5 — Historical playback
 

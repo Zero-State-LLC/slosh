@@ -43,8 +43,18 @@ public protocol NOAADataTransport: Sendable {
 public struct URLSessionNOAATransport: NOAADataTransport, @unchecked Sendable {
     private let session: URLSession
 
-    public init(session: URLSession = .shared) {
-        self.session = session
+    public init(session: URLSession? = nil) {
+        self.session = session ?? Self.makeDefaultSession()
+    }
+
+    public static func makeDefaultSession() -> URLSession {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 10
+        configuration.timeoutIntervalForResource = 20
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.allowsExpensiveNetworkAccess = false
+        configuration.waitsForConnectivity = false
+        return URLSession(configuration: configuration)
     }
 
     public func data(from url: URL) async throws -> Data {
@@ -70,27 +80,37 @@ public struct NOAACOOPSProvider<Transport: NOAADataTransport>: HydroStateProvide
     }
 
     public func fetch(_ waterBody: WaterBody) async throws -> HydroState {
-        var samples: [NOAAProductSample] = []
-        var sawCancellation = false
-
-        for request in requests(for: waterBody) {
-            do {
-                guard let url = request.url else { throw NOAAProviderError.invalidRequest }
-                let data = try await transport.data(from: url)
-                let sample = try NOAAHydroAdapter.decode(
-                    data, product: request.product, stationID: request.stationID
-                )
-                if sample.hasMeasurement { samples.append(sample) }
-            } catch is CancellationError {
-                sawCancellation = true
-                break
-            } catch {
-                // Partial product coverage is normal. Individual failures stay
-                // absent; only an entirely empty aggregate fails below.
-                continue
+        let requests = requests(for: waterBody)
+        let samples = try await withThrowingTaskGroup(of: NOAAProductSample?.self) { group in
+            for request in requests {
+                try Task.checkCancellation()
+                group.addTask { [transport] in
+                    try Task.checkCancellation()
+                    do {
+                        guard let url = request.url else { throw NOAAProviderError.invalidRequest }
+                        let data = try await transport.data(from: url)
+                        let sample = try NOAAHydroAdapter.decode(
+                            data, product: request.product, stationID: request.stationID
+                        )
+                        return sample.hasMeasurement ? sample : nil
+                    } catch let error as URLError where error.code == .cancelled {
+                        throw CancellationError()
+                    } catch is CancellationError {
+                        throw CancellationError()
+                    } catch {
+                        // Partial product coverage is normal. Individual failures stay
+                        // absent; only an entirely empty aggregate fails below.
+                        return nil
+                    }
+                }
             }
+
+            var samples: [NOAAProductSample] = []
+            for try await sample in group {
+                if let sample { samples.append(sample) }
+            }
+            return samples
         }
-        if sawCancellation { throw CancellationError() }
         return try NOAAHydroAggregator.state(samples: samples, retrievedAt: Date())
     }
 

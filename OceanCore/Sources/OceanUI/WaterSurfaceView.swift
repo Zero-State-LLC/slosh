@@ -8,16 +8,22 @@ import SwiftUI
 /// restart the shader clock and jump the waves.
 public struct WaterSurfaceView: View {
     private let scene: WaterScene
+    private let preferredFramesPerSecond: Int
     private let onTap: ((CGPoint) -> Void)?
 
-    public init(scene: WaterScene, onTap: ((CGPoint) -> Void)? = nil) {
+    public init(
+        scene: WaterScene,
+        preferredFramesPerSecond: Int = 60,
+        onTap: ((CGPoint) -> Void)? = nil
+    ) {
         self.scene = scene
+        self.preferredFramesPerSecond = preferredFramesPerSecond
         self.onTap = onTap
     }
 
     public var body: some View {
         GeometryReader { geometry in
-            SpriteView(scene: scene, preferredFramesPerSecond: 60)
+            SpriteView(scene: scene, preferredFramesPerSecond: preferredFramesPerSecond)
                 .onAppear { scene.size = geometry.size }
                 .onChange(of: geometry.size) { _, newSize in
                     scene.size = newSize

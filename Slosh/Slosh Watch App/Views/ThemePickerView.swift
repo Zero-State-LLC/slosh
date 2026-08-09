@@ -2,7 +2,6 @@ import OceanCore
 import OceanUI
 import SpriteKit
 import SwiftUI
-import WatchKit
 
 /// One page per ocean, each a live preview rather than a swatch — the whole
 /// point is that the themes *move* differently, which a static colour chip
@@ -12,9 +11,29 @@ struct ThemePickerView: View {
     @Binding var selectedPlaceID: String
     @Binding var hapticsEnabled: Bool
     let realWaterLoadState: RealWaterLoadState
+    let haptics: Haptics?
     @Environment(\.dismiss) private var dismiss
 
-    @State private var page: String = ""
+    @State private var page: String
+    @State private var previewScenes = ThemePreviewSceneStore()
+
+    init(
+        selectedThemeID: Binding<String>,
+        selectedPlaceID: Binding<String>,
+        hapticsEnabled: Binding<Bool>,
+        realWaterLoadState: RealWaterLoadState,
+        haptics: Haptics? = nil
+    ) {
+        self._selectedThemeID = selectedThemeID
+        self._selectedPlaceID = selectedPlaceID
+        self._hapticsEnabled = hapticsEnabled
+        self.realWaterLoadState = realWaterLoadState
+        self.haptics = haptics
+        self._page = State(initialValue: Self.pageID(
+            themeID: selectedThemeID.wrappedValue,
+            placeID: selectedPlaceID.wrappedValue
+        ))
+    }
 
     var body: some View {
         NavigationStack {
@@ -23,13 +42,14 @@ struct ThemePickerView: View {
                     ThemePage(
                         theme: theme,
                         isCurrent: selectedPlaceID.isEmpty && theme.id == selectedThemeID,
+                        scene: previewScenes.scene(for: theme),
                         choose: {
                             selectedPlaceID = ""
                             selectedThemeID = theme.id
                             WatchSelectionSync.shared.recordLocal(
                                 .experience(themeID: theme.id)
                             )
-                            WKInterfaceDevice.current().play(.click)
+                            playSelectionHaptic()
                             dismiss()
                         }
                     )
@@ -46,7 +66,7 @@ struct ThemePickerView: View {
                             WatchSelectionSync.shared.recordLocal(
                                 .place(waterBodyID: waterBody.id)
                             )
-                            WKInterfaceDevice.current().play(.click)
+                            playSelectionHaptic()
                             dismiss()
                         }
                     )
@@ -58,9 +78,41 @@ struct ThemePickerView: View {
             }
             .tabViewStyle(.verticalPage)
         }
-        .onAppear {
-            page = selectedPlaceID.isEmpty ? selectedThemeID : "place:\(selectedPlaceID)"
+        .onChange(of: selectedThemeID) { _, _ in
+            page = Self.pageID(themeID: selectedThemeID, placeID: selectedPlaceID)
         }
+        .onChange(of: selectedPlaceID) { _, _ in
+            page = Self.pageID(themeID: selectedThemeID, placeID: selectedPlaceID)
+        }
+    }
+
+    private static func pageID(themeID: String, placeID: String) -> String {
+        placeID.isEmpty ? themeID : "place:\(placeID)"
+    }
+
+    private func playSelectionHaptic() {
+        if let haptics {
+            haptics.playSelection()
+        } else if hapticsEnabled {
+            Haptics().playSelection()
+        }
+    }
+}
+
+@MainActor
+private final class ThemePreviewSceneStore {
+    private var scenes: [String: WaterScene] = [:]
+
+    func scene(for theme: OceanTheme) -> WaterScene {
+        if let scene = scenes[theme.id] { return scene }
+        let scene = WaterScene()
+        scene.allowsParticles = false
+        scene.size = CGSize(width: Screen.width, height: 84)
+        scene.scaleMode = .resizeFill
+        scene.theme = theme
+        scene.motionSource = DriftingMotion(startAngle: 0.8)
+        scenes[theme.id] = scene
+        return scene
     }
 }
 
@@ -277,28 +329,14 @@ private struct SignalProvenanceView: View {
 private struct ThemePage: View {
     let theme: OceanTheme
     let isCurrent: Bool
+    let scene: WaterScene
     let choose: () -> Void
 
     /// Each page runs its own small ocean, drifting slowly so the preview
     /// shows the swell moving without a wrist behind it.
-    @State private var scene: WaterScene
-
-    init(theme: OceanTheme, isCurrent: Bool, choose: @escaping () -> Void) {
-        self.theme = theme
-        self.isCurrent = isCurrent
-        self.choose = choose
-
-        let scene = WaterScene()
-        scene.size = CGSize(width: Screen.width, height: 84)
-        scene.scaleMode = .resizeFill
-        scene.theme = theme
-        scene.motionSource = DriftingMotion(startAngle: 0.8)
-        _scene = State(initialValue: scene)
-    }
-
     var body: some View {
         VStack(spacing: 6) {
-            WaterSurfaceView(scene: scene)
+            WaterSurfaceView(scene: scene, preferredFramesPerSecond: 30)
                 .frame(height: 84)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .overlay {

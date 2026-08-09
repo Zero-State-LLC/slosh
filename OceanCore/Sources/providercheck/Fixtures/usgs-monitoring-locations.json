@@ -1,0 +1,27 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "monitoring_location_number": "10337000",
+        "monitoring_location_name": "LAKE TAHOE A TAHOE CITY CA",
+        "site_type_code": "LK",
+        "site_type": "Lake, Reservoir, Impoundment",
+        "hydrologic_unit_code": "16050101"
+      },
+      "geometry": {"type": "Point", "coordinates": [-120.1446972, 39.16780556]}
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "monitoring_location_number": "10336635",
+        "monitoring_location_name": "LAKE TAHOE TRIB NR MEEKS BAY CA",
+        "site_type_code": "ST",
+        "site_type": "Stream",
+        "hydrologic_unit_code": "160501010402"
+      },
+      "geometry": {"type": "Point", "coordinates": [-120.126575657399, 39.0174076488572]}
+    }
+  ]
+}

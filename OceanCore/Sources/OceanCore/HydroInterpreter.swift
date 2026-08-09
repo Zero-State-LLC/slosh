@@ -55,10 +55,46 @@ public struct HydroInterpreter: Sendable {
         let periodValue = period ?? 0
         let combinedWaveWind = waveValue * windValue
 
-        let energy = clamp(0.08 + 0.55 * waveValue + 0.20 * currentValue + 0.14 * windValue + secondary)
-        let chop = clamp(0.58 * waveValue + 0.32 * windValue + 0.10 * periodValue + secondary)
-        let turbulence = clamp(0.62 * windValue + 0.23 * currentValue + 0.15 * waveValue + secondary)
-        let foam = clamp(0.55 * combinedWaveWind + 0.30 * waveValue + 0.15 * windValue)
+        let energy = clamp(
+            0.08 + redistributedSignal([
+                (wave, 0.55),
+                (current, 0.20),
+                (wind, 0.14),
+            ]) + secondary
+        )
+        let chop = clamp(
+            redistributedSignal([
+                (wave, 0.58),
+                (wind, 0.32),
+                (period, 0.10),
+            ]) + secondary
+        )
+        let turbulence = clamp(
+            redistributedSignal([
+                (wind, 0.62),
+                (current, 0.23),
+                (wave, 0.15),
+            ]) + secondary
+        )
+        let foam: Double
+        let crestSharpness: Double
+        if wave == nil {
+            // Missing wave measurements are absence of evidence, not a zero-sea
+            // observation. Keep wave amplitude at zero, but transfer the style
+            // authority that normally depends on wave height to observed wind and
+            // current shear so provider slices without waves still move visibly.
+            foam = redistributedSignal([
+                (wind, 0.60),
+                (current, 0.40),
+            ])
+            crestSharpness = redistributedSignal([
+                (wind, 0.55),
+                (current, 0.45),
+            ]) * 0.85
+        } else {
+            foam = clamp(0.55 * combinedWaveWind + 0.30 * waveValue + 0.15 * windValue)
+            crestSharpness = clamp(0.65 * combinedWaveWind + 0.20 * waveValue)
+        }
 
         let forcing = EnvironmentalForcing(
             energy: energy,
@@ -85,7 +121,7 @@ public struct HydroInterpreter: Sendable {
         let modifiers = HydroThemeModifiers(
             choppiness: clamp(chop * 0.55),
             turbulence: clamp(turbulence * 0.60),
-            crestSharpness: clamp(0.65 * combinedWaveWind + 0.20 * waveValue),
+            crestSharpness: clamp(crestSharpness),
             foaminess: clamp(foam * 0.70),
             causticStrength: clamp(secondary * 0.35),
             glitter: clamp(0.12 * windValue + 0.08 * waveValue)
@@ -117,6 +153,18 @@ public struct HydroInterpreter: Sendable {
         ) else { return nil }
         guard let measurement else { return nil }
         return clamp(measurement.value / maximum)
+    }
+
+    private func redistributedSignal(_ components: [(value: Double?, weight: Double)]) -> Double {
+        let available = components.compactMap { component -> (value: Double, weight: Double)? in
+            guard let value = component.value else { return nil }
+            return (value, component.weight)
+        }
+        let availableWeight = available.reduce(0) { $0 + $1.weight }
+        guard availableWeight > 0 else { return 0 }
+        let intendedWeight = components.reduce(0) { $0 + $1.weight }
+        let weightedValue = available.reduce(0) { $0 + $1.value * $1.weight }
+        return clamp(weightedValue / availableWeight * intendedWeight)
     }
 
     private func normalizedMagnitude(

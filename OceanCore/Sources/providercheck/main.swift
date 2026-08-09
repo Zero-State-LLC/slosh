@@ -33,6 +33,53 @@ private struct FixtureUSGSTransport: USGSDataTransport {
     func data(from url: URL) async throws -> Data { payload }
 }
 
+private actor URLCancelledNOAATransport: NOAADataTransport {
+    private let payloads: [String: Data]
+    private(set) var requestedProducts: [String] = []
+
+    init(payloads: [String: Data]) {
+        self.payloads = payloads
+    }
+
+    func data(from url: URL) async throws -> Data {
+        let product = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?
+            .first(where: { $0.name == "product" })?
+            .value ?? ""
+        requestedProducts.append(product)
+        if product == "wind" { throw URLError(.cancelled) }
+        guard let payload = payloads[product] else { throw NOAAProviderError.noUsableMeasurements }
+        return payload
+    }
+
+    func products() -> [String] { requestedProducts }
+}
+
+private actor ConcurrentNOAATransport: NOAADataTransport {
+    private let payloads: [String: Data]
+    private var activeRequests = 0
+    private(set) var maxActiveRequests = 0
+
+    init(payloads: [String: Data]) {
+        self.payloads = payloads
+    }
+
+    func data(from url: URL) async throws -> Data {
+        let product = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?
+            .first(where: { $0.name == "product" })?
+            .value ?? ""
+        activeRequests += 1
+        maxActiveRequests = max(maxActiveRequests, activeRequests)
+        try await Task.sleep(nanoseconds: 50_000_000)
+        activeRequests -= 1
+        guard let payload = payloads[product] else { throw NOAAProviderError.noUsableMeasurements }
+        return payload
+    }
+
+    func maximumActiveRequests() -> Int { maxActiveRequests }
+}
+
 private actor SequencedProvider: HydroStateProvider {
     enum Result: Sendable {
         case success(HydroState)
@@ -78,6 +125,27 @@ private actor FixedProvider: HydroStateProvider {
         case let .success(state): return state
         case .failure: throw RoutedHydroProviderError.noUsableMeasurements
         }
+    }
+
+    func count() -> Int { fetchCount }
+}
+
+private actor URLCancelledThenSuccessProvider: HydroStateProvider {
+    private let state: HydroState
+    private var canceledOnce = false
+    private(set) var fetchCount = 0
+
+    init(state: HydroState) {
+        self.state = state
+    }
+
+    func fetch(_ waterBody: WaterBody) async throws -> HydroState {
+        fetchCount += 1
+        if !canceledOnce {
+            canceledOnce = true
+            throw URLError(.cancelled)
+        }
+        return state
     }
 
     func count() -> Int { fetchCount }
@@ -179,6 +247,36 @@ Check.expect(
 
 let montereyRequests = requestProvider.requests(for: WaterBodies.montereyBay)
 Check.expect(montereyRequests.map(\.product) == [.waterLevel, .waterTemperature, .airPressure], "Monterey requests only reviewed products")
+let defaultNOAASession = URLSessionNOAATransport.makeDefaultSession()
+Check.expect(defaultNOAASession.configuration.timeoutIntervalForRequest == 10, "NOAA live transport uses a watch-bounded request timeout")
+Check.expect(defaultNOAASession.configuration.timeoutIntervalForResource == 20, "NOAA live transport uses a watch-bounded resource timeout")
+Check.expect(defaultNOAASession.configuration.requestCachePolicy == .reloadIgnoringLocalCacheData, "NOAA live transport bypasses cached provider bodies")
+Check.expect(defaultNOAASession.configuration.allowsExpensiveNetworkAccess == false, "NOAA live transport avoids expensive network access")
+Check.expect(defaultNOAASession.configuration.waitsForConnectivity == false, "NOAA live transport fails fast instead of waiting for connectivity")
+
+let noaaPayloads = [
+    "water_level": try fixture("valid-water-level"),
+    "wind": try fixture("valid-wind"),
+    "air_pressure": try fixture("valid-pressure"),
+    "currents": try fixture("valid-currents"),
+]
+private let cancelledNOAATransport = URLCancelledNOAATransport(payloads: noaaPayloads)
+private let cancelledNOAAProvider = NOAACOOPSProvider(transport: cancelledNOAATransport)
+do {
+    _ = try await cancelledNOAAProvider.fetch(bay)
+    Check.expect(false, "NOAA provider treats URLSession canceled requests as cancellation")
+} catch is CancellationError {
+    Check.expect(true, "NOAA provider treats URLSession canceled requests as cancellation")
+} catch {
+    Check.expect(false, "NOAA provider treats URLSession canceled requests as cancellation: \(error)")
+}
+
+private let concurrentNOAATransport = ConcurrentNOAATransport(payloads: noaaPayloads)
+private let concurrentNOAAProvider = NOAACOOPSProvider(transport: concurrentNOAATransport)
+let concurrentNOAAState = try await concurrentNOAAProvider.fetch(bay)
+Check.expect(concurrentNOAAState.waterLevel != nil && concurrentNOAAState.windSpeed != nil, "concurrent NOAA fetch still aggregates usable products")
+let maxNOAAConcurrency = await concurrentNOAATransport.maximumActiveRequests()
+Check.expect(maxNOAAConcurrency > 1, "NOAA provider fetches products concurrently")
 private let usgsProvider = USGSIVProvider(transport: FixtureUSGSTransport(payload: try fixture("valid-usgs-lake-level")))
 let tahoeRequests = usgsProvider.requests(for: WaterBodies.lakeTahoe)
 Check.expect(tahoeRequests.count == 1 && tahoeRequests[0].siteID == "10337000", "Lake Tahoe resolves to reviewed USGS site")
@@ -504,6 +602,87 @@ Check.expect(
     "B remains throttled while canceled A retries independently"
 )
 
+private let urlCancelledProvider = URLCancelledThenSuccessProvider(state: stateA)
+let urlCancelledCoordinator = LiveHydroCoordinator(provider: urlCancelledProvider)
+let urlCancelledFirst = await urlCancelledCoordinator.refresh(waterBody: bayA, referenceDate: retrievedAt)
+Check.expect(urlCancelledFirst == .unavailable, "URLSession cancellation leaves uncached water unavailable")
+let urlCancelledRetry = await urlCancelledCoordinator.refresh(
+    waterBody: bayA,
+    referenceDate: retrievedAt.addingTimeInterval(1)
+)
+if case let .updated(updatedState, _) = urlCancelledRetry {
+    Check.expect(updatedState == stateA, "URLSession cancellation resets throttle for immediate retry")
+} else {
+    Check.expect(false, "URLSession cancellation resets throttle for immediate retry")
+}
+let urlCancelledFetchCount = await urlCancelledProvider.count()
+Check.expect(urlCancelledFetchCount == 2, "URLSession cancellation does not suppress the next coordinator fetch")
+
+print("\nProvider metadata candidate adapters")
+let tahoeCoordinate = GeographicCoordinate(
+    latitude: WaterBodies.lakeTahoe.latitude,
+    longitude: WaterBodies.lakeTahoe.longitude
+)
+let noaaMetadataRequest = NOAACOOPSMetadataRequest(stationID: "9414290")
+Check.expect(
+    noaaMetadataRequest.url?.absoluteString == "https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations/9414290.json",
+    "NOAA metadata request uses the public station endpoint"
+)
+let noaaCandidates = try NOAACOOPSMetadataCandidateAdapter.decode(
+    fixture("noaa-stations-metadata"),
+    selectedCoordinate: GeographicCoordinate(latitude: 37.806305, longitude: -122.46589)
+)
+Check.expect(noaaCandidates.map(\.source.sourceID) == ["9414290", "9413450"], "NOAA metadata candidates sort deterministically by distance")
+Check.expect(noaaCandidates[0].source.capabilities.isEmpty, "NOAA station metadata does not invent product capabilities")
+Check.expect(noaaCandidates[0].evidence.map(\.kind) == [.proximityOnly], "NOAA station metadata supplies proximity evidence only")
+let reviewedNOAACandidates = try NOAACOOPSMetadataCandidateAdapter.decode(
+    fixture("noaa-stations-metadata"),
+    selectedCoordinate: GeographicCoordinate(latitude: 37.806305, longitude: -122.46589),
+    reviewedCapabilities: ["9414290": [.waterLevel, .wind]]
+)
+Check.expect(reviewedNOAACandidates[0].source.capabilities == [.waterLevel, .wind], "separately reviewed NOAA capabilities remain explicit")
+Check.expect(reviewedNOAACandidates[0].evidence.contains { $0.kind == .productAvailable }, "reviewed NOAA product availability is recorded as separate evidence")
+
+let usgsRequest = USGSMonitoringLocationsRequest(center: tahoeCoordinate, radiusDegrees: 0.25, limit: 25)
+let usgsURL = usgsRequest.url?.absoluteString ?? ""
+Check.expect(usgsURL.contains("monitoring-locations/items"), "USGS metadata request uses the public OGC collection")
+Check.expect(usgsURL.contains("bbox="), "USGS metadata request is geographically bounded")
+Check.expect(USGSMonitoringLocationsRequest(center: tahoeCoordinate, radiusDegrees: -1).url == nil, "USGS metadata request rejects invalid radius")
+let usgsCandidates = try USGSMonitoringLocationCandidateAdapter.decode(
+    fixture("usgs-monitoring-locations"),
+    selectedCoordinate: tahoeCoordinate
+)
+Check.expect(usgsCandidates.map(\.source.sourceID) == ["10337000", "10336635"], "USGS candidates sort by distance rather than response order")
+Check.expect(usgsCandidates[0].source.locationKind == .lake, "USGS lake site class maps to provider-independent lake kind")
+Check.expect(usgsCandidates[1].source.locationKind == .river, "USGS stream site class maps to provider-independent river kind")
+Check.expect(usgsCandidates.allSatisfy { $0.source.capabilities.isEmpty }, "USGS location metadata does not imply observation products")
+Check.expect(usgsCandidates[0].evidence.contains { $0.kind == .hydrologicallyConnected }, "USGS HUC is preserved as hydrologic evidence")
+Check.expect(usgsCandidates[1].evidence.contains { $0.kind == .proximityOnly }, "nearby tributary remains proximity evidence, not lake identity")
+let metadataOnlyDecision = WaterBodyResolutionEvaluator().evaluate(.init(
+    feature: GeographicFeatureIdentity(
+        namespace: "fixture.feature",
+        featureID: "lake-tahoe",
+        name: "Lake Tahoe",
+        kind: .lake,
+        representativeCoordinate: tahoeCoordinate
+    ),
+    observationSources: usgsCandidates.map(\.source),
+    evidence: usgsCandidates.flatMap(\.evidence)
+))
+Check.expect(metadataOnlyDecision.confidence == .needsReview, "provider metadata alone cannot accept a WaterBody resolution")
+let encodedMetadataCandidates = try JSONEncoder().encode(usgsCandidates)
+Check.expect(
+    !encodedMetadataCandidates.isEmpty,
+    "provider metadata candidates encode as portable research artifacts"
+)
+
+do {
+    _ = try NOAACOOPSMetadataCandidateAdapter.decode(Data("{}".utf8), selectedCoordinate: tahoeCoordinate)
+    Check.expect(false, "malformed NOAA metadata fails closed")
+} catch {
+    Check.expect(true, "malformed NOAA metadata fails closed")
+}
+
 if CommandLine.arguments.contains("--live") {
     print("\nLive NOAA smoke test")
     let liveProvider = LiveNOAACOOPSProvider()
@@ -546,6 +725,32 @@ if CommandLine.arguments.contains("--live") {
         Check.expect(liveTahoe.waterLevel?.sourceID == "usgs.nwis.10337000.00065", "live USGS response preserves source identity")
     } catch {
         Check.expect(false, "live USGS smoke test succeeded: \(error)")
+    }
+
+    print("\nLive provider metadata smoke test")
+    do {
+        let noaaMetadataURL = NOAACOOPSMetadataRequest(stationID: "9414290").url!
+        let noaaMetadataData = try await URLSessionNOAATransport().data(from: noaaMetadataURL)
+        let liveNOAACandidates = try NOAACOOPSMetadataCandidateAdapter.decode(
+            noaaMetadataData,
+            selectedCoordinate: GeographicCoordinate(latitude: bay.latitude, longitude: bay.longitude)
+        )
+        Check.expect(liveNOAACandidates.first?.source.sourceID == "9414290", "live NOAA metadata produces the requested station candidate")
+
+        let usgsMetadataURL = USGSMonitoringLocationsRequest(
+            center: tahoeCoordinate,
+            radiusDegrees: 0.2,
+            limit: 25
+        ).url!
+        let usgsMetadataData = try await URLSessionUSGSTransport().data(from: usgsMetadataURL)
+        let liveUSGSCandidates = try USGSMonitoringLocationCandidateAdapter.decode(
+            usgsMetadataData,
+            selectedCoordinate: tahoeCoordinate
+        )
+        Check.expect(!liveUSGSCandidates.isEmpty, "live USGS metadata produces bounded monitoring-location candidates")
+        Check.expect(liveUSGSCandidates.allSatisfy { $0.source.capabilities.isEmpty }, "live USGS metadata remains capability-conservative")
+    } catch {
+        Check.expect(false, "live provider metadata smoke test succeeded: \(error)")
     }
 }
 

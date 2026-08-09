@@ -15,6 +15,14 @@ private struct OfflineHydroProvider: HydroStateProvider {
 final class PlacesAppModel {
     private static let selectionKey = "selectedWaterEnvelope"
 
+    private static func defaultForceOffline(defaults: UserDefaults) -> Bool {
+        #if DEBUG
+        defaults.bool(forKey: "placesOffline")
+        #else
+        false
+        #endif
+    }
+
     private let coordinator: LiveHydroCoordinator
     private let resolver = PlaceHydroStatusResolver()
     private let transport: any WaterSelectionTransport
@@ -27,9 +35,10 @@ final class PlacesAppModel {
     init(
         defaults: UserDefaults = .standard,
         transport: any WaterSelectionTransport = WatchSelectionTransport.shared,
-        forceOffline: Bool = UserDefaults.standard.bool(forKey: "placesOffline")
+        forceOffline: Bool? = nil
     ) {
-        let provider: any HydroStateProvider = forceOffline
+        let shouldForceOffline = forceOffline ?? Self.defaultForceOffline(defaults: defaults)
+        let provider: any HydroStateProvider = shouldForceOffline
             ? OfflineHydroProvider()
             : RoutedHydroProvider.liveCurated()
         coordinator = LiveHydroCoordinator(provider: provider)
@@ -136,6 +145,9 @@ final class WatchSelectionTransport: NSObject, WaterSelectionTransport, WCSessio
 
     var onReceive: (@Sendable (WaterSelectionEnvelope) -> Void)?
     private let session: WCSession?
+    private let lock = NSLock()
+    private var pendingEnvelope: WaterSelectionEnvelope?
+    private var newestEnvelope: WaterSelectionEnvelope?
 
     override init() {
         session = WCSession.isSupported() ? .default : nil
@@ -146,20 +158,49 @@ final class WatchSelectionTransport: NSObject, WaterSelectionTransport, WCSessio
 
     func send(_ envelope: WaterSelectionEnvelope) async throws {
         guard let session else { return }
-        let data = try JSONEncoder().encode(envelope)
-        try session.updateApplicationContext(["selectedWater": data])
+        let shouldSend = lock.withLock {
+            let resolved = envelope.replacing(newestEnvelope)
+            guard resolved == envelope else { return false }
+            newestEnvelope = envelope
+            pendingEnvelope = envelope
+            return true
+        }
+        guard shouldSend else { return }
+        try flushPendingIfPossible(session)
     }
 
     func session(
         _ session: WCSession,
         activationDidCompleteWith activationState: WCSessionActivationState,
         error: Error?
-    ) {}
+    ) {
+        deliverReceivedApplicationContext(from: session)
+        try? flushPendingIfPossible(session)
+    }
 
     func sessionDidBecomeInactive(_ session: WCSession) {}
     func sessionDidDeactivate(_ session: WCSession) { session.activate() }
 
     func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) {
+        deliver(applicationContext)
+    }
+
+    private func flushPendingIfPossible(_ session: WCSession) throws {
+        try lock.withLock {
+            guard session.activationState == .activated, let envelope = pendingEnvelope else { return }
+            let data = try JSONEncoder().encode(envelope)
+            try session.updateApplicationContext(["selectedWater": data])
+            if pendingEnvelope == envelope {
+                pendingEnvelope = nil
+            }
+        }
+    }
+
+    private func deliverReceivedApplicationContext(from session: WCSession) {
+        deliver(session.receivedApplicationContext)
+    }
+
+    private func deliver(_ applicationContext: [String: Any]) {
         guard let data = applicationContext["selectedWater"] as? Data,
               let envelope = try? JSONDecoder().decode(WaterSelectionEnvelope.self, from: data) else {
             return

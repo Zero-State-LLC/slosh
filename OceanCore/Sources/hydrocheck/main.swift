@@ -141,6 +141,34 @@ let smallWave = interpreter.interpret(state(waveHeight: 0.2), referenceDate: ref
 let largeWave = interpreter.interpret(state(waveHeight: 4), referenceDate: referenceDate)
 Check.expect(smallWave.forcing.waveAmplitude < largeWave.forcing.waveAmplitude, "higher waves must raise amplitude")
 
+let bayNoWaveLow = interpreter.interpret(
+    state(currentSpeed: 0.4, windSpeed: 4), referenceDate: referenceDate
+)
+let bayNoWaveHigh = interpreter.interpret(
+    state(currentSpeed: 1.6, windSpeed: 18), referenceDate: referenceDate
+)
+Check.equal(bayNoWaveHigh.forcing.waveAmplitude, 0, "absent waves must not synthesize wave amplitude")
+Check.expect(
+    bayNoWaveLow.themeModifiers.crestSharpness > 0,
+    "wave-absent current and wind must still drive crest sharpness"
+)
+Check.expect(
+    bayNoWaveLow.themeModifiers.foaminess > 0,
+    "wave-absent current and wind must still drive foaminess"
+)
+Check.expect(
+    bayNoWaveLow.themeModifiers.crestSharpness < bayNoWaveHigh.themeModifiers.crestSharpness,
+    "wave-absent crest sharpness must scale with observed current and wind"
+)
+Check.expect(
+    bayNoWaveLow.themeModifiers.foaminess < bayNoWaveHigh.themeModifiers.foaminess,
+    "wave-absent foaminess must scale with observed current and wind"
+)
+Check.expect(
+    bayNoWaveLow.forcing.chop < bayNoWaveHigh.forcing.chop,
+    "wave-absent chop must reweight to observed wind"
+)
+
 let missing = HydroState(observedAt: referenceDate, retrievedAt: referenceDate)
 Check.expect(missing.currentSpeed == nil && missing.waveHeight == nil && missing.windSpeed == nil, "missing measurements must remain nil")
 Check.expect(interpreter.interpret(state(currentSpeed: 1), referenceDate: referenceDate).forcing.flowDirection == nil, "missing current direction must stay nil")

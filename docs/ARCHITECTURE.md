@@ -125,6 +125,17 @@ policy deterministic and network-free. `ReviewedWaterBodyPromotion` separately
 requires an accepted decision and reviewed source bindings before a candidate can
 become a `WaterBody`.
 
+RW4E adds research-only provider metadata adapters inside `HydroProviders`.
+`NOAACOOPSMetadataCandidateAdapter` translates public MDAPI station identity and
+coordinates, while `USGSMonitoringLocationCandidateAdapter` translates OGC
+monitoring-location identity, site class, coordinates, and HUC. Both emit
+`ProviderMetadataCandidate` values containing the portable source candidate and
+explicit evidence. Station distance is always labeled `proximityOnly`. USGS
+location metadata claims no measurement capabilities, and NOAA capabilities are
+accepted only as separately reviewed input. Consequently metadata alone cannot
+produce an accepted resolution or a `WaterBody`. Geographic feature resolution
+remains fixture-backed and no adapter is wired into product UI.
+
 ## Rendering
 
 ### Physical validation instrumentation

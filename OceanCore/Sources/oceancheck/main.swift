@@ -1,5 +1,6 @@
 import Foundation
 import OceanCore
+import OceanUI
 
 let dt = 1.0 / 60.0
 
@@ -60,6 +61,19 @@ Check.suite("Flow direction") {
         var driver = SurfaceDriver()
         driver.advance(dt: dt, motion: MotionSample(gravityX: .nan, gravityY: .nan))
         Check.expect(driver.flowX.isFinite && driver.flowY.isFinite, "flow poisoned by NaN")
+    }
+}
+
+Check.suite("Preview motion") {
+    Check.test("drifting motion advances when a scene updates") {
+        let motion = DriftingMotion(startAngle: 0, rate: 1)
+        let scene = WaterScene()
+        scene.motionSource = motion
+        scene.size = CGSize(width: 80, height: 80)
+        scene.update(0)
+        let before = motion.current.gravityX
+        scene.update(1.0 / 60.0)
+        Check.greaterThan(motion.current.gravityX, before, "preview drift never advanced")
     }
 }
 

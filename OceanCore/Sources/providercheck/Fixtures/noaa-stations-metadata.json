@@ -1,0 +1,7 @@
+{
+  "count": 2,
+  "stations": [
+    {"tidal": true, "id": "9414290", "name": "San Francisco", "lat": 37.806305, "lng": -122.46589},
+    {"tidal": true, "id": "9413450", "name": "Monterey", "lat": 36.6089, "lng": -121.8914}
+  ]
+}
