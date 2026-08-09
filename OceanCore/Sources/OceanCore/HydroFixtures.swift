@@ -23,6 +23,19 @@ public enum HydroFixtures {
         waterLevel: 2.4, temperature: 9, pressure: 975, salinity: 25
     )
 
+    /// Deterministic DEBUG/preview entry point. Unknown names remain absent
+    /// rather than silently selecting an environmental state.
+    public static func experience(named name: String) -> HydroExperience? {
+        let fixture: HydroState
+        switch name {
+        case "calm": fixture = calm
+        case "active": fixture = active
+        case "severe": fixture = severe
+        default: return nil
+        }
+        return HydroInterpreter().interpret(fixture, referenceDate: referenceDate)
+    }
+
     private static func measurement(
         _ value: Double,
         _ unit: HydroUnit,

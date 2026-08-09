@@ -25,6 +25,18 @@ Provider DTO → HydroState → HydroInterpreter → HydroExperience
 normalized `EnvironmentalForcing` and renderer-vocabulary-only
 `HydroThemeModifiers`. Provider DTOs never enter `OceanCore`.
 
+The synthetic visual path is:
+
+```text
+HydroThemeModifiers → ResolvedWaterStyle → existing WaterScene uniforms
+```
+
+`ResolvedWaterStyle` combines an immutable authored `OceanTheme` with bounded
+Hydro modifiers. `WaterScene` sends resolved choppiness, turbulence, crest
+sharpness, and glitter through the existing packed `u_wave` value, and resolved
+caustic strength and foaminess through `u_optics`. No shader uniform was added or
+renamed. Removing Hydro modifiers restores the authored values exactly.
+
 ## Interaction and composition rule
 
 **Environmental data is persistent forcing. Wrist movement is transient
@@ -107,6 +119,29 @@ Observation rate != simulation rate != render rate.
 Environmental observations may update only every several minutes. Slosh still
 simulates interaction and renders continuously between those updates. Provider
 polling must never be coupled to the display loop.
+
+## Deterministic simulator fixtures
+
+Debug simulator builds accept `-hydroFixture calm`, `active`, or `severe`.
+Each launch interprets the synthetic state with `HydroFixtures.referenceDate`
+and applies both its forcing and theme modifiers to the same **Calm ocean** base
+theme. Release and physical-watch builds compile the fixture path to `nil`.
+
+Using the repository's current bundle identifier:
+
+```bash
+xcrun simctl launch <watch-udid> com.example.Slosh.watchkitapp \
+  -hydroFixture calm
+xcrun simctl launch <watch-udid> com.example.Slosh.watchkitapp \
+  -hydroFixture active
+xcrun simctl launch <watch-udid> com.example.Slosh.watchkitapp \
+  -hydroFixture severe
+```
+
+These are synthetic visual-QA inputs only. They are never presented as
+observations of a geographic place.
+
+![Calm, active, and severe synthetic fixture comparison](../media/real-water/rw2a5-fixture-comparison.png)
 
 ## First vertical slice
 

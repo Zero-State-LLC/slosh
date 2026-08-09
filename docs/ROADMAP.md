@@ -168,6 +168,10 @@ relevant product foundation is sound.
   `SurfaceDriver` as a bounded persistent baseline; wrist gravity temporarily
   owns direction, shake remains transient, direction conventions are canonical,
   suspect measurements are ignored, and future clock skew is bounded.
+- **RW2A.5 visual wiring complete:** synthetic Hydro theme modifiers resolve
+  against an immutable authored theme and reach the existing packed shader
+  uniforms. Debug simulator fixtures provide calm/active/severe comparison on
+  one Calm ocean base without adding shader uniforms.
 - **Still planned:** connect a real San Francisco Bay observation source. No live
   provider or place data exists yet.
 - Add the first curated place using NOAA CO-OPS, then USGS Water Data where it

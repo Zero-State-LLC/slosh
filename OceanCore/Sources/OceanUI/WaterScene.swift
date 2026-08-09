@@ -29,6 +29,12 @@ public final class WaterScene: SKScene {
         didSet { driver.environmentalForcing = environmentalForcing }
     }
 
+    /// Already-normalized visual influence. WaterScene resolves it against the
+    /// immutable authored theme and never sees HydroState or provider data.
+    public var hydroThemeModifiers: HydroThemeModifiers? {
+        didSet { applyResolvedStyle() }
+    }
+
     /// Set false when the app backgrounds or the screen dims — the scene keeps
     /// existing but stops costing anything.
     public var isRunning = true
@@ -95,18 +101,11 @@ public final class WaterScene: SKScene {
         uniforms["u_skyA"]?.vectorFloat3Value = theme.skyColorA.simd
         uniforms["u_skyB"]?.vectorFloat3Value = theme.skyColorB.simd
 
-        uniforms["u_wave"]?.vectorFloat4Value = vector_float4(
-            Float(theme.choppiness), Float(theme.turbulence),
-            Float(theme.crestSharpness), Float(theme.glitter)
-        )
         uniforms["u_layers"]?.vectorFloat4Value = vector_float4(
             Float(theme.bedDetail), Float(theme.shadows),
             Float(theme.shafts), Float(theme.skyGlow)
         )
-        uniforms["u_optics"]?.vectorFloat4Value = vector_float4(
-            Float(theme.causticStrength), Float(theme.causticTimeScale),
-            Float(theme.foaminess), Float(theme.glowResponse)
-        )
+        applyResolvedStyle()
 
         particles?.removeFromParent()
         particles = nil
@@ -119,6 +118,20 @@ public final class WaterScene: SKScene {
             addChild(field)
             particles = field
         }
+    }
+
+    /// Style changes only touch the two existing packed uniforms. The scene,
+    /// shader, surface node, and particle field remain intact.
+    private func applyResolvedStyle() {
+        let style = ResolvedWaterStyle(base: theme, modifiers: hydroThemeModifiers)
+        uniforms["u_wave"]?.vectorFloat4Value = vector_float4(
+            Float(style.choppiness), Float(style.turbulence),
+            Float(style.crestSharpness), Float(style.glitter)
+        )
+        uniforms["u_optics"]?.vectorFloat4Value = vector_float4(
+            Float(style.causticStrength), Float(theme.causticTimeScale),
+            Float(style.foaminess), Float(theme.glowResponse)
+        )
     }
 
     // MARK: - Frame
