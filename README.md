@@ -36,8 +36,9 @@ built, rejected and thrown away.
 
 ## Future direction: Real Water
 
-Slosh contains authored water **Experiences**. An experimental DEBUG simulator
-vertical slice renders San Francisco Bay, while the reviewed Real Water catalog
+Slosh contains authored water **Experiences**. A DEBUG live-provider route and
+the normal Places selection can render San Francisco Bay on a physical Watch or
+simulator, while the reviewed Real Water catalog
 now also describes Monterey Bay and Lake Tahoe with explicit partial coverage.
 The watch picker can select those curated Places; NOAA CO-OPS and USGS NWIS
 observations stay behind provider-independent Hydro contracts. This is not
@@ -60,6 +61,8 @@ keeping the full-screen water experience free of telemetry.
 Two things genuinely require a real watch and are the gate on everything else:
 the tilt axis and sign, and per-pixel shader performance. Both are detailed in
 [docs/ROADMAP.md](docs/ROADMAP.md#phase-0--hardware-validation).
+The deterministic device runbook is
+[docs/PHYSICAL_WATCH_VALIDATION.md](docs/PHYSICAL_WATCH_VALIDATION.md).
 
 ## Quick start
 

@@ -121,8 +121,11 @@ implementation cost.
   with no obvious utility can be read as "not enough". Mitigate by shipping
   iOS + watchOS together, listing the modes explicitly in the description, and
   making the screenshots do the arguing.
-- Privacy nutrition label: **collects nothing**, which is genuinely true and
-  worth stating plainly. No analytics SDK, no network calls at all.
+- Privacy submission position: no analytics SDK, user account, behavioral
+  tracking, user-profile backend, or analytics identifier exists. Real Water
+  performs requests to configured public environmental-data providers. The
+  final nutrition label and transport disclosures must be verified against the
+  shipping provider set at submission time; do not claim "no network calls."
 - Motion sensor usage needs no permission string — device motion is not gated
   the way the activity and pedometer APIs are — but confirm this at submission
   time rather than trusting it.
@@ -204,9 +207,11 @@ relevant product foundation is sound.
   provenance without covering the water, identifies preserved versus unavailable
   fetch outcomes, and rejects late async results from a previously selected
   Place.
-- **Next:** RW3C — catalog expansion and provider coverage research. Validate the
-  status model with the current three-Place product before adding automatic
-  discovery. If those three Places are sufficient, proceed instead to RW4's
+- **Next:** complete the Phase 0 physical-watch gate. If physical hardware passes,
+  apply only evidence-backed P0B fixes and close Phase 0. If hardware remains
+  unavailable after P0A readiness, proceed to RW4A's curated iPhone browser while
+  keeping Phase 0 explicitly unresolved. Do not expand the catalog to defer the
+  hardware gate. The current three-Place product is sufficient for validation and RW4's
   iPhone geographic-discovery foundation.
 
 ### RW4 — iPhone geographic discovery

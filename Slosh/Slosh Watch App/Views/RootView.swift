@@ -22,12 +22,19 @@ struct RootView: View {
     /// Synthetic fixtures win when both flags are supplied. The launch argument
     /// overrides persisted selection so every curated route is scriptable.
     private static let debugRealWaterBody: WaterBody? = {
-        #if DEBUG && targetEnvironment(simulator)
+        #if DEBUG
+        if let validationBody = PhysicalValidationMode.waterBody {
+            return validationBody
+        }
+        #if targetEnvironment(simulator)
         guard debugHydroExperience == nil,
               let id = UserDefaults.standard.string(forKey: "realWater") else {
             return nil
         }
         return WaterBodies.body(id: id)
+        #else
+        return nil
+        #endif
         #else
         return nil
         #endif
@@ -58,6 +65,9 @@ struct RootView: View {
     )
     @State private var realWaterLoadState: RealWaterLoadState = .inactive
     @State private var crownEnergy = EnergyRange.default
+    #if DEBUG
+    @State private var physicalValidationDiagnostics = PhysicalValidationDiagnostics()
+    #endif
 
     /// `simctl launch … -startInPicker YES` opens straight to the picker.
     /// The simulator offers no way to script a tap, so without this the whole
@@ -71,7 +81,12 @@ struct RootView: View {
     }()
 
     private var theme: OceanTheme {
-        RootView.debugHydroExperience == nil && activeWaterBody == nil
+        #if DEBUG
+        if let validationTheme = PhysicalValidationMode.authoredTheme {
+            return validationTheme
+        }
+        #endif
+        return RootView.debugHydroExperience == nil && activeWaterBody == nil
             ? .theme(id: themeID)
             : .calmOcean
     }
@@ -124,10 +139,19 @@ struct RootView: View {
             model.apply(hydroExperience: RootView.debugHydroExperience)
             model.apply(energy: storedEnergy)
             model.haptics.isEnabled = hapticsEnabled
+            #if DEBUG
+            physicalValidationDiagnostics.install(on: model)
+            model.haptics.onAttempt = { kind, fired, reason in
+                physicalValidationDiagnostics.haptic(kind: kind, fired: fired, reason: reason)
+            }
+            #endif
             model.startRunning()
             activateRealWater()
         }
         .onDisappear {
+            #if DEBUG
+            physicalValidationDiagnostics.lifecycle("view-disappear")
+            #endif
             deactivateRealWater()
             model.stopRunning()
         }
@@ -155,18 +179,30 @@ struct RootView: View {
         .onChange(of: scenePhase) { _, phase in
             // Nothing runs unless the app is frontmost and the screen is lit.
             if phase == .active, !isLuminanceReduced {
+                #if DEBUG
+                physicalValidationDiagnostics.lifecycle("foreground-bright")
+                #endif
                 model.startRunning()
                 activateRealWater()
             } else {
+                #if DEBUG
+                physicalValidationDiagnostics.lifecycle("scene-\(String(describing: phase))")
+                #endif
                 deactivateRealWater()
                 model.stopRunning()
             }
         }
         .onChange(of: isLuminanceReduced) { _, dimmed in
             if dimmed {
+                #if DEBUG
+                physicalValidationDiagnostics.lifecycle("luminance-reduced")
+                #endif
                 deactivateRealWater()
                 model.stopRunning()
             } else if scenePhase == .active {
+                #if DEBUG
+                physicalValidationDiagnostics.lifecycle("luminance-restored")
+                #endif
                 model.startRunning()
                 activateRealWater()
             }

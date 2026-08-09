@@ -21,3 +21,6 @@ Package.resolved
 
 # Local captures that are not part of the documented media set
 shots/
+
+# Volatile physical-device logs, reports, and DerivedData
+out/physical-watch-validation/

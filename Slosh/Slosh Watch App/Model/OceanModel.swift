@@ -37,6 +37,10 @@ final class OceanModel {
         source as? SimulatedMotionProvider
     }
 
+    var physicalMotionDiagnostics: WatchMotionProvider.DiagnosticState? {
+        (source as? WatchMotionProvider)?.diagnosticState
+    }
+
     // MARK: - Lifecycle
 
     /// Sensors and rendering run only while the app is frontmost. This is the

@@ -495,4 +495,58 @@ Check.suite("Themes") {
     }
 }
 
+Check.suite("Physical validation metrics") {
+    Check.test("60 Hz frames produce a 60 FPS rolling estimate") {
+        var monitor = FrameRateMonitor()
+        for frame in 0...120 {
+            _ = monitor.recordFrame(at: Double(frame) / 60)
+        }
+        let snapshot = monitor.recordFrame(at: 121.0 / 60.0)!
+        Check.equal(snapshot.rollingFPS, 60, accuracy: 0.01, "rolling FPS drifted")
+        Check.equal(snapshot.averageFPS, 60, accuracy: 0.01, "average FPS drifted")
+        Check.equal(snapshot.slowFrameCount, 0, "normal frames were counted slow")
+    }
+
+    Check.test("slow-frame threshold is strict and centralized") {
+        var monitor = FrameRateMonitor()
+        _ = monitor.recordFrame(at: 0)
+        _ = monitor.recordFrame(at: FrameRateMonitor.Thresholds.slowFrameInterval)
+        let snapshot = monitor.recordFrame(
+            at: FrameRateMonitor.Thresholds.slowFrameInterval * 2 + 0.001
+        )!
+        Check.equal(snapshot.slowFrameCount, 1, "slow threshold classification changed")
+    }
+
+    Check.test("lifecycle boundary excludes a resume gap") {
+        var monitor = FrameRateMonitor()
+        _ = monitor.recordFrame(at: 0)
+        _ = monitor.recordFrame(at: 1.0 / 60.0)
+        monitor.resetBoundary()
+        _ = monitor.recordFrame(at: 300)
+        let snapshot = monitor.recordFrame(at: 300 + 1.0 / 60.0)!
+        Check.equal(snapshot.slowFrameCount, 0, "resume gap counted as a slow frame")
+    }
+
+    Check.test("validation report round trips through JSON") {
+        let report = PhysicalWatchValidationReport(
+            device: "Watch",
+            watchOS: "26.0",
+            configuration: "left-crown-right",
+            generatedAt: Date(timeIntervalSince1970: 123),
+            tests: [
+                .init(
+                    id: "PERF-1",
+                    startTime: Date(timeIntervalSince1970: 124),
+                    durationSeconds: 300,
+                    modeOrPlace: "Calm ocean",
+                    metrics: ["averageFPS": "60.0"]
+                )
+            ]
+        )
+        let data = try! JSONEncoder().encode(report)
+        let decoded = try! JSONDecoder().decode(PhysicalWatchValidationReport.self, from: data)
+        Check.equal(decoded, report, "validation report did not round trip")
+    }
+}
+
 exit(Check.report())

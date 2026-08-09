@@ -4,10 +4,26 @@ import SwiftUI
 
 /// Hosts the water shader and feeds it uniforms once per frame.
 public final class WaterScene: SKScene {
+    public struct DiagnosticSnapshot: Sendable {
+        public let frameRate: FrameRateMonitor.Snapshot
+        public let gravityX: Double
+        public let gravityY: Double
+        public let inPlaneMagnitude: Double
+        public let heading: Double
+        public let flowX: Double
+        public let flowY: Double
+    }
+
     private var surface = SKSpriteNode()
     private var driver = SurfaceDriver()
     private var particles: ParticleField?
     private var lastUpdate: TimeInterval?
+    private var frameRateMonitor = FrameRateMonitor()
+    private var lastDiagnosticReportTime: TimeInterval = -.infinity
+
+    /// Validation-only consumers may install this callback. Normal production
+    /// rendering pays only one nil check and never logs or changes physics.
+    public var onDiagnostics: ((DiagnosticSnapshot) -> Void)?
 
     public var theme: OceanTheme = .calmOcean {
         didSet {
@@ -146,6 +162,22 @@ public final class WaterScene: SKScene {
 
         driver.advance(dt: dt, motion: motionSource.current)
 
+        if onDiagnostics != nil,
+           let frameRate = frameRateMonitor.recordFrame(at: currentTime),
+           currentTime - lastDiagnosticReportTime >= FrameRateMonitor.Thresholds.reportingInterval {
+            let motion = motionSource.current
+            lastDiagnosticReportTime = currentTime
+            onDiagnostics?(DiagnosticSnapshot(
+                frameRate: frameRate,
+                gravityX: motion.gravityX,
+                gravityY: motion.gravityY,
+                inPlaneMagnitude: hypot(motion.gravityX, motion.gravityY),
+                heading: driver.heading,
+                flowX: driver.flowX,
+                flowY: driver.flowY
+            ))
+        }
+
         uniforms["u_now"]?.floatValue = Float(driver.time)
         uniforms["u_flowCenter"]?.vectorFloat4Value = vector_float4(
             Float(driver.flowX), Float(driver.flowY),
@@ -179,6 +211,7 @@ public final class WaterScene: SKScene {
 
     public func resume() {
         lastUpdate = nil
+        frameRateMonitor.resetBoundary()
         isRunning = true
     }
 

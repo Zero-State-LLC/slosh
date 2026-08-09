@@ -76,6 +76,25 @@ activation overwrite a newer request for the same Place.
 
 ## Rendering
 
+### Physical validation instrumentation
+
+`FrameRateMonitor` is pure `OceanCore` logic. `WaterScene` supplies SpriteKit
+update timestamps and exposes an optional aggregate diagnostic callback; it does
+not own a timer or log per frame. The callback is nil in normal operation.
+
+The watch target installs `PhysicalValidationDiagnostics` only in `DEBUG` when
+`-physicalValidation YES` is present. It combines the renderer aggregate with
+raw/crown-corrected motion, public wrist/crown settings, battery, thermal,
+lifecycle, and haptic events in OSLog. Deterministic routes select Calm ocean,
+Breaking surf, Storm at night, or the existing live San Francisco Bay provider
+path. None of these routes changes `SurfaceDriver`, shader parameters, or Hydro
+interpretation, and the diagnostics activation code is absent from Release.
+
+Lifecycle resume resets both the renderer's existing `lastUpdate` boundary and
+the frame monitor boundary. Background time therefore cannot become a fake slow
+frame or giant simulation step. The canonical execution contract and artifact
+format live in [PHYSICAL_WATCH_VALIDATION.md](PHYSICAL_WATCH_VALIDATION.md).
+
 Everything visible derives from **one analytic height field**, evaluated per
 pixel. There is no simulation grid and no state between frames.
 

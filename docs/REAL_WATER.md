@@ -296,6 +296,12 @@ attempted on activation and no more often than every **10 minutes**. In-flight
 work is cancelled when the app backgrounds or the display enters reduced
 luminance; no render-rate timer exists. Caching is in-memory only.
 
+The live provider path is not simulator-only. In DEBUG physical-validation mode,
+`-physicalValidation YES -validationRoute san-francisco-bay` selects the same
+curated San Francisco Bay body and `RoutedHydroProvider.liveCurated()` used by
+normal Place selection. Synthetic fixture and forced-offline arguments remain
+simulator-only.
+
 Failure behavior is explicit:
 
 ```text
@@ -307,6 +313,27 @@ failure without prior state     → preserve authored Calm ocean
 For simulator QA, `-realWaterOffline YES` forces the unavailable path. Synthetic
 `-hydroFixture` arguments take precedence over `-realWater` when both are
 present, preserving deterministic fixture testing.
+
+### Network privacy audit
+
+Real Water makes direct HTTPS requests to the configured NOAA CO-OPS and USGS
+NWIS public environmental-data services. This is the current factual boundary:
+
+| Exposure | Current behavior |
+|---|---|
+| Public IP | Naturally visible to NOAA/USGS and their transport infrastructure as part of an HTTP request |
+| Application identifier/query | NOAA requests send `application=Slosh`; provider query parameters identify the requested product |
+| Station/product | The reviewed station/site, product, datum, units, time zone, and related provider parameters are transmitted |
+| Device location | Not transmitted; Places are selected from a curated catalog and no location API feeds provider requests |
+| User identity | No account, name, email, advertising identifier, or user profile is sent |
+| Analytics identifiers | No analytics SDK or behavioral-tracking identifier exists in the repository |
+
+Server-side retention, CDN behavior, and final App Store transport/privacy
+disclosures are outside the repository's direct proof and must be verified at
+submission time against the then-current provider endpoints and policies. The
+accurate product promise is: no analytics SDK, user account, behavioral tracking,
+or user-profile backend; Real Water contacts configured public environmental-data
+providers.
 
 ![Authored failure fallback and live San Francisco Bay NOAA water](../media/real-water/rw2b-live-fallback-comparison.png)
 
@@ -409,10 +436,11 @@ Debug simulator launch arguments accept every curated ID:
 -realWater lake-tahoe
 ```
 
-The recommended next slice is **RW3C — catalog expansion and provider coverage
-research**, using the status model to evaluate each proposed addition before the
-catalog grows. If the three reviewed Places are sufficient for the product, move
-instead to RW4's iPhone geographic-discovery foundation. USGS Water Data and NOAA
+Catalog growth stops here until the Phase 0 physical-watch gate produces evidence.
+If a physical Watch passes, the next slice is **P0B — apply only evidence-backed
+device fixes, then close Phase 0**. If no physical Watch is accessible after P0A
+readiness, the next software slice may be **RW4A — iPhone curated Places browser
+foundation**, while Phase 0 remains explicitly open. USGS Water Data and NOAA
 ERDDAP remain options only where they contribute a distinct, reviewed measurement.
 
 ## Explicit non-goals of the current Real Water slices
