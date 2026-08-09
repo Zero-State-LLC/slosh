@@ -5,6 +5,31 @@
 Real Water is a planned product domain. It extends Slosh without replacing the
 authored experiences that already define the app.
 
+## Device roles
+
+```text
+iPhone → browse Places, inspect coverage and provenance, choose water
+Watch  → experience and wear the selected water
+```
+
+RW4A adds a native iPhone catalog browser for San Francisco Bay, Monterey Bay,
+and Lake Tahoe. Catalog identity, reviewed coverage, and coordinates are local
+and remain available offline. Live status loads asynchronously per Place through
+the existing routed provider and coordinator architecture, so browsing never
+waits for networking and one Place cannot inherit another Place's result.
+
+The detail screen presents provider-independent freshness, all six display
+signal groups, observed/missing/stale/unsupported distinctions, values,
+observation age, quality, origin, provider/station names, and canonical source
+IDs. A failed fetch shows cached coordinator state as preserved when available;
+otherwise it truthfully reports current observations unavailable.
+
+Selection uses a shared `SelectedWater` value wrapped with timestamp and device
+origin. It persists locally and crosses a protocol-abstracted WatchConnectivity
+boundary. The most recent deliberate selection wins after reconnection. RW4A
+does not add a map, remote Place search, station discovery, polling, or a new
+renderer.
+
 ## Two domains
 
 - **Experiences** are the existing authored `OceanTheme` modes. They define a

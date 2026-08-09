@@ -12,6 +12,10 @@ Nothing here is scheduled. Effort estimates assume one person working part-time.
 
 **Blocks everything. Nothing else should start until this is done.**
 
+**Status: OPEN / NOT_RUN.** P0A software readiness and instrumentation are
+complete, but no accessible paired physical Apple Watch is available. Simulator
+results do not close the tilt, GPU, battery, thermal, lifecycle, or haptic gate.
+
 The app has never run on a physical watch. Two unknowns could each force
 significant rework, and no amount of simulator work reduces either.
 
@@ -216,9 +220,19 @@ relevant product foundation is sound.
 
 ### RW4 — iPhone geographic discovery
 
-- Add geographic browsing and selection on iPhone after the curated catalog has
-  established the data and product model.
-- Keep map and station-discovery concerns out of `OceanCore`.
+- **RW4A complete:** the iPhone target is now the curated discovery/configuration
+  surface. It browses all three reviewed Places, progressively loads keyed live
+  status, exposes detailed provenance, persists canonical selection, and defines
+  a protocol-abstracted iPhone-to-Watch selection boundary with deterministic
+  latest-selection-wins semantics.
+- Offline catalog and reviewed coverage remain visible. Cached observations may
+  be shown as preserved; absent cache is reported as unavailable, never fresh.
+- Physical Watch synchronization is **NOT_RUN** because no accessible paired
+  physical Apple Watch is available. Fake transport tests cover canonical IDs
+  and ordering, not actual companion delivery.
+- **Next: RW4B — geographic map browsing over the existing curated catalog.**
+  Keep arbitrary station discovery, remote Place search, and provider concerns
+  out of `OceanCore`.
 
 ### RW5 — Historical playback
 

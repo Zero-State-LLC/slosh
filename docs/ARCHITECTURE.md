@@ -74,6 +74,27 @@ The watch coordinator scopes load state and result application by canonical
 Place's status or forcing after another Place becomes active, or let an older
 activation overwrite a newer request for the same Place.
 
+### iPhone discovery and selection boundary
+
+The iPhone target is the information-rich discovery/configuration surface. It
+links `OceanCore` and `HydroProviders` directly, renders `WaterBodies.all`, and
+uses the same `LiveHydroCoordinator`, `PlaceHydroStatusResolver`, and
+`HydroPresentationFormatter` as the Watch. Provider DTOs do not enter iPhone
+views, and list loading is keyed by canonical `WaterBody.id` so concurrent Place
+requests cannot overwrite one another.
+
+`SelectedWater` is the shared provider-independent selection concept. A
+`WaterSelectionEnvelope` adds a deliberate-selection timestamp and origin. The
+newest valid envelope wins after reconnect; equal timestamps resolve by canonical
+selection ID. `WaterSelectionTransport` keeps WatchConnectivity outside the
+domain model and permits deterministic fake transports in software tests.
+
+The iPhone persists the envelope in `UserDefaults` and sends it through
+`updateApplicationContext`. The Watch applies received canonical IDs through an
+additive adapter to its existing theme/place settings, avoiding a risky picker
+migration. Physical companion delivery remains unverified until a paired Watch
+is available.
+
 ## Rendering
 
 ### Physical validation instrumentation

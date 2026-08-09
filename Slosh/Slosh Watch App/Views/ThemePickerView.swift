@@ -26,6 +26,9 @@ struct ThemePickerView: View {
                         choose: {
                             selectedPlaceID = ""
                             selectedThemeID = theme.id
+                            WatchSelectionSync.shared.recordLocal(
+                                .experience(themeID: theme.id)
+                            )
                             WKInterfaceDevice.current().play(.click)
                             dismiss()
                         }
@@ -40,6 +43,9 @@ struct ThemePickerView: View {
                         loadState: realWaterLoadState,
                         choose: {
                             selectedPlaceID = waterBody.id
+                            WatchSelectionSync.shared.recordLocal(
+                                .place(waterBodyID: waterBody.id)
+                            )
                             WKInterfaceDevice.current().play(.click)
                             dismiss()
                         }

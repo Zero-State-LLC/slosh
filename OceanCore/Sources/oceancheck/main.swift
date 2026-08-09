@@ -549,4 +549,88 @@ Check.suite("Physical validation metrics") {
     }
 }
 
+Check.suite("iPhone Places selection foundation") {
+    Check.test("catalog exposes all three reviewed Places and map coordinates") {
+        Check.equal(WaterBodies.all.count, 3, "curated catalog count changed")
+        Check.expect(
+            Set(WaterBodies.all.map(\.id)) == [
+                "san-francisco-bay", "monterey-bay", "lake-tahoe",
+            ],
+            "curated catalog identity changed"
+        )
+        for waterBody in WaterBodies.all {
+            Check.expect(
+                waterBody.latitude.isFinite && waterBody.longitude.isFinite,
+                "\(waterBody.name) lost map-ready coordinates"
+            )
+        }
+    }
+
+    Check.test("selection persistence round trips canonical Place identity") {
+        let envelope = WaterSelectionEnvelope(
+            selection: .place(waterBodyID: WaterBodies.montereyBay.id),
+            selectedAt: Date(timeIntervalSince1970: 42),
+            origin: .iphone
+        )
+        let data = try! JSONEncoder().encode(envelope)
+        let decoded = try! JSONDecoder().decode(WaterSelectionEnvelope.self, from: data)
+        Check.equal(decoded, envelope, "selection did not persist losslessly")
+        Check.expect(decoded.selection.isCatalogValid, "canonical Place became invalid")
+    }
+
+    Check.test("newest deliberate selection wins independent of device origin") {
+        let newer = WaterSelectionEnvelope(
+            selection: .place(waterBodyID: WaterBodies.lakeTahoe.id),
+            selectedAt: Date(timeIntervalSince1970: 20),
+            origin: .watch
+        )
+        let older = WaterSelectionEnvelope(
+            selection: .place(waterBodyID: WaterBodies.sanFranciscoBay.id),
+            selectedAt: Date(timeIntervalSince1970: 10),
+            origin: .iphone
+        )
+        Check.equal(older.replacing(newer), newer, "stale message overwrote newer selection")
+        Check.equal(newer.replacing(older), newer, "newer selection was rejected")
+    }
+
+    Check.test("multi-place loading remains keyed by canonical ID") {
+        var store = PlaceObservationStore()
+        store.beginLoading(WaterBodies.sanFranciscoBay.id)
+        store.accept(.unavailable, for: WaterBodies.lakeTahoe.id)
+        Check.equal(
+            store.state(for: WaterBodies.sanFranciscoBay.id),
+            .loading,
+            "Lake Tahoe completion repainted San Francisco"
+        )
+        Check.equal(
+            store.state(for: WaterBodies.lakeTahoe.id),
+            .unavailable,
+            "Lake Tahoe state was not isolated"
+        )
+        Check.equal(
+            store.state(for: WaterBodies.montereyBay.id),
+            .idle,
+            "untouched Place did not remain idle"
+        )
+    }
+
+    Check.test("fake transport records canonical selection deterministically") {
+        let transport = RecordingWaterSelectionTransport()
+        let envelope = WaterSelectionEnvelope(
+            selection: .place(waterBodyID: WaterBodies.sanFranciscoBay.id),
+            selectedAt: Date(timeIntervalSince1970: 50),
+            origin: .iphone
+        )
+        let finished = DispatchSemaphore(value: 0)
+        Task {
+            try! await transport.send(envelope)
+            finished.signal()
+        }
+        finished.wait()
+        let sent = transport.sent
+        Check.equal(sent, [envelope], "fake transport changed or dropped selection")
+        Check.equal(sent.first?.selection.canonicalID, "place:san-francisco-bay")
+    }
+}
+
 exit(Check.report())

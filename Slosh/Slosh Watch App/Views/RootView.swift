@@ -134,6 +134,7 @@ struct RootView: View {
             )
         }
         .onAppear {
+            _ = WatchSelectionSync.shared
             crownEnergy = storedEnergy
             model.apply(theme: theme)
             model.apply(hydroExperience: RootView.debugHydroExperience)
