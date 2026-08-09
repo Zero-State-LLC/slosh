@@ -33,6 +33,53 @@ private struct FixtureUSGSTransport: USGSDataTransport {
     func data(from url: URL) async throws -> Data { payload }
 }
 
+private actor URLCancelledNOAATransport: NOAADataTransport {
+    private let payloads: [String: Data]
+    private(set) var requestedProducts: [String] = []
+
+    init(payloads: [String: Data]) {
+        self.payloads = payloads
+    }
+
+    func data(from url: URL) async throws -> Data {
+        let product = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?
+            .first(where: { $0.name == "product" })?
+            .value ?? ""
+        requestedProducts.append(product)
+        if product == "wind" { throw URLError(.cancelled) }
+        guard let payload = payloads[product] else { throw NOAAProviderError.noUsableMeasurements }
+        return payload
+    }
+
+    func products() -> [String] { requestedProducts }
+}
+
+private actor ConcurrentNOAATransport: NOAADataTransport {
+    private let payloads: [String: Data]
+    private var activeRequests = 0
+    private(set) var maxActiveRequests = 0
+
+    init(payloads: [String: Data]) {
+        self.payloads = payloads
+    }
+
+    func data(from url: URL) async throws -> Data {
+        let product = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?
+            .first(where: { $0.name == "product" })?
+            .value ?? ""
+        activeRequests += 1
+        maxActiveRequests = max(maxActiveRequests, activeRequests)
+        try await Task.sleep(nanoseconds: 50_000_000)
+        activeRequests -= 1
+        guard let payload = payloads[product] else { throw NOAAProviderError.noUsableMeasurements }
+        return payload
+    }
+
+    func maximumActiveRequests() -> Int { maxActiveRequests }
+}
+
 private actor SequencedProvider: HydroStateProvider {
     enum Result: Sendable {
         case success(HydroState)
@@ -78,6 +125,27 @@ private actor FixedProvider: HydroStateProvider {
         case let .success(state): return state
         case .failure: throw RoutedHydroProviderError.noUsableMeasurements
         }
+    }
+
+    func count() -> Int { fetchCount }
+}
+
+private actor URLCancelledThenSuccessProvider: HydroStateProvider {
+    private let state: HydroState
+    private var canceledOnce = false
+    private(set) var fetchCount = 0
+
+    init(state: HydroState) {
+        self.state = state
+    }
+
+    func fetch(_ waterBody: WaterBody) async throws -> HydroState {
+        fetchCount += 1
+        if !canceledOnce {
+            canceledOnce = true
+            throw URLError(.cancelled)
+        }
+        return state
     }
 
     func count() -> Int { fetchCount }
@@ -179,6 +247,36 @@ Check.expect(
 
 let montereyRequests = requestProvider.requests(for: WaterBodies.montereyBay)
 Check.expect(montereyRequests.map(\.product) == [.waterLevel, .waterTemperature, .airPressure], "Monterey requests only reviewed products")
+let defaultNOAASession = URLSessionNOAATransport.makeDefaultSession()
+Check.expect(defaultNOAASession.configuration.timeoutIntervalForRequest == 10, "NOAA live transport uses a watch-bounded request timeout")
+Check.expect(defaultNOAASession.configuration.timeoutIntervalForResource == 20, "NOAA live transport uses a watch-bounded resource timeout")
+Check.expect(defaultNOAASession.configuration.requestCachePolicy == .reloadIgnoringLocalCacheData, "NOAA live transport bypasses cached provider bodies")
+Check.expect(defaultNOAASession.configuration.allowsExpensiveNetworkAccess == false, "NOAA live transport avoids expensive network access")
+Check.expect(defaultNOAASession.configuration.waitsForConnectivity == false, "NOAA live transport fails fast instead of waiting for connectivity")
+
+let noaaPayloads = [
+    "water_level": try fixture("valid-water-level"),
+    "wind": try fixture("valid-wind"),
+    "air_pressure": try fixture("valid-pressure"),
+    "currents": try fixture("valid-currents"),
+]
+private let cancelledNOAATransport = URLCancelledNOAATransport(payloads: noaaPayloads)
+private let cancelledNOAAProvider = NOAACOOPSProvider(transport: cancelledNOAATransport)
+do {
+    _ = try await cancelledNOAAProvider.fetch(bay)
+    Check.expect(false, "NOAA provider treats URLSession canceled requests as cancellation")
+} catch is CancellationError {
+    Check.expect(true, "NOAA provider treats URLSession canceled requests as cancellation")
+} catch {
+    Check.expect(false, "NOAA provider treats URLSession canceled requests as cancellation: \(error)")
+}
+
+private let concurrentNOAATransport = ConcurrentNOAATransport(payloads: noaaPayloads)
+private let concurrentNOAAProvider = NOAACOOPSProvider(transport: concurrentNOAATransport)
+let concurrentNOAAState = try await concurrentNOAAProvider.fetch(bay)
+Check.expect(concurrentNOAAState.waterLevel != nil && concurrentNOAAState.windSpeed != nil, "concurrent NOAA fetch still aggregates usable products")
+let maxNOAAConcurrency = await concurrentNOAATransport.maximumActiveRequests()
+Check.expect(maxNOAAConcurrency > 1, "NOAA provider fetches products concurrently")
 private let usgsProvider = USGSIVProvider(transport: FixtureUSGSTransport(payload: try fixture("valid-usgs-lake-level")))
 let tahoeRequests = usgsProvider.requests(for: WaterBodies.lakeTahoe)
 Check.expect(tahoeRequests.count == 1 && tahoeRequests[0].siteID == "10337000", "Lake Tahoe resolves to reviewed USGS site")
@@ -503,6 +601,22 @@ Check.expect(
     cancellationFetchedIDs == [bayB.id, bayA.id, bayA.id],
     "B remains throttled while canceled A retries independently"
 )
+
+private let urlCancelledProvider = URLCancelledThenSuccessProvider(state: stateA)
+let urlCancelledCoordinator = LiveHydroCoordinator(provider: urlCancelledProvider)
+let urlCancelledFirst = await urlCancelledCoordinator.refresh(waterBody: bayA, referenceDate: retrievedAt)
+Check.expect(urlCancelledFirst == .unavailable, "URLSession cancellation leaves uncached water unavailable")
+let urlCancelledRetry = await urlCancelledCoordinator.refresh(
+    waterBody: bayA,
+    referenceDate: retrievedAt.addingTimeInterval(1)
+)
+if case let .updated(updatedState, _) = urlCancelledRetry {
+    Check.expect(updatedState == stateA, "URLSession cancellation resets throttle for immediate retry")
+} else {
+    Check.expect(false, "URLSession cancellation resets throttle for immediate retry")
+}
+let urlCancelledFetchCount = await urlCancelledProvider.count()
+Check.expect(urlCancelledFetchCount == 2, "URLSession cancellation does not suppress the next coordinator fetch")
 
 print("\nProvider metadata candidate adapters")
 let tahoeCoordinate = GeographicCoordinate(
