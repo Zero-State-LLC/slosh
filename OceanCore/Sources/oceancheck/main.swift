@@ -676,4 +676,153 @@ Check.suite("iPhone Places selection foundation") {
     }
 }
 
+Check.suite("Geographic resolution candidate prototype") {
+    let tahoeCoordinate = GeographicCoordinate(latitude: 39.1807, longitude: -120.1193)
+    let tahoeFeature = GeographicFeatureIdentity(
+        namespace: "gov.usgs.nhd.waterbody",
+        featureID: "tahoe-feature",
+        name: "Lake Tahoe",
+        kind: .lake,
+        representativeCoordinate: tahoeCoordinate
+    )
+    let tahoeSource = ObservationSourceCandidate(
+        namespace: "gov.usgs.nwis.iv",
+        sourceID: "10337000",
+        name: "Lake Tahoe A Tahoe City CA",
+        coordinate: GeographicCoordinate(latitude: 39.167, longitude: -120.142),
+        locationKind: .lake,
+        capabilities: [.waterLevel],
+        distanceMeters: 2_400
+    )
+    let acceptedTahoe = WaterBodyResolutionCandidate(
+        feature: tahoeFeature,
+        observationSources: [tahoeSource],
+        evidence: [
+            .init(kind: .selectedPointContainedByFeature, source: "NHD", note: "point in lake polygon"),
+            .init(kind: .sourceContainedByFeature, source: "NHD", note: "site in same lake polygon"),
+            .init(kind: .compatibleWaterBodyClass, source: "USGS", note: "lake site"),
+            .init(kind: .productAvailable, source: "USGS", note: "gage height available"),
+        ]
+    )
+
+    Check.test("authoritative inland feature evidence can be accepted") {
+        let decision = WaterBodyResolutionEvaluator().evaluate(acceptedTahoe)
+        Check.equal(decision.confidence, .accepted)
+    }
+
+    Check.test("nearer station on a conflicting feature is rejected") {
+        let nearbyTruckee = ObservationSourceCandidate(
+            namespace: "gov.usgs.nwis.iv",
+            sourceID: "truckee-nearby",
+            name: "Truckee River near Tahoe City",
+            coordinate: GeographicCoordinate(latitude: 39.17, longitude: -120.14),
+            locationKind: .river,
+            capabilities: [.waterLevel],
+            distanceMeters: 120
+        )
+        let candidate = WaterBodyResolutionCandidate(
+            feature: tahoeFeature,
+            observationSources: [nearbyTruckee],
+            evidence: [
+                .init(kind: .selectedPointContainedByFeature, source: "NHD", note: "point in Tahoe"),
+                .init(kind: .proximityOnly, source: "distance", note: "closer than lake gage"),
+                .init(kind: .conflictingFeature, source: "NHD", note: "source is on Truckee River"),
+                .init(kind: .productAvailable, source: "USGS", note: "gage height available"),
+            ]
+        )
+        Check.equal(WaterBodyResolutionEvaluator().evaluate(candidate).confidence, .rejected)
+    }
+
+    Check.test("coastal proximity and name evidence still requires review") {
+        let bay = GeographicFeatureIdentity(
+            namespace: "research.coastal.feature",
+            featureID: "sf-bay",
+            name: "San Francisco Bay",
+            kind: .bay,
+            representativeCoordinate: GeographicCoordinate(latitude: 37.8, longitude: -122.4)
+        )
+        let station = ObservationSourceCandidate(
+            namespace: "gov.noaa.coops.station",
+            sourceID: "9414290",
+            name: "San Francisco",
+            coordinate: GeographicCoordinate(latitude: 37.806, longitude: -122.466),
+            locationKind: .bay,
+            capabilities: [.waterLevel, .wind],
+            distanceMeters: 1_000
+        )
+        let candidate = WaterBodyResolutionCandidate(
+            feature: bay,
+            observationSources: [station],
+            evidence: [
+                .init(kind: .selectedPointContainedByFeature, source: "research", note: "point in proposed bay"),
+                .init(kind: .compatibleWaterBodyClass, source: "NOAA", note: "coastal station"),
+                .init(kind: .nameAgreement, source: "NOAA", note: "station name overlaps"),
+                .init(kind: .proximityOnly, source: "distance", note: "nearby"),
+                .init(kind: .productAvailable, source: "NOAA", note: "water level available"),
+            ]
+        )
+        Check.equal(WaterBodyResolutionEvaluator().evaluate(candidate).confidence, .needsReview)
+    }
+
+    Check.test("unsupported coordinates remain not computable") {
+        let candidate = WaterBodyResolutionCandidate(
+            feature: nil,
+            observationSources: [],
+            evidence: [.init(kind: .unsupportedRegion, source: "coverage", note: "no provider coverage")]
+        )
+        Check.equal(WaterBodyResolutionEvaluator().evaluate(candidate).confidence, .notComputable)
+    }
+
+    Check.test("fixture provider is exact and deterministic") {
+        let provider = FixtureWaterBodyResolutionCandidateProvider(fixtures: [tahoeCoordinate: [acceptedTahoe]])
+        let finished = DispatchSemaphore(value: 0)
+        var resolved: [WaterBodyResolutionCandidate] = []
+        Task {
+            resolved = await provider.candidates(at: tahoeCoordinate)
+            finished.signal()
+        }
+        finished.wait()
+        Check.equal(resolved, [acceptedTahoe])
+    }
+
+    Check.test("promotion requires acceptance and separately reviewed bindings") {
+        let evaluator = WaterBodyResolutionEvaluator()
+        let decision = evaluator.evaluate(acceptedTahoe)
+        let binding = HydroSourceBinding(
+            namespace: tahoeSource.namespace,
+            sourceID: tahoeSource.sourceID,
+            capabilities: tahoeSource.capabilities
+        )
+        let promoted = try! ReviewedWaterBodyPromotion().promote(
+            acceptedTahoe,
+            decision: decision,
+            id: "reviewed-tahoe",
+            region: "California / Nevada, USA",
+            reviewedBindings: [binding]
+        )
+        Check.equal(promoted.name, "Lake Tahoe")
+        Check.equal(promoted.sourceBindings, [binding])
+
+        let reviewDecision = WaterBodyResolutionDecision(confidence: .needsReview, reasons: ["unproven"])
+        do {
+            _ = try ReviewedWaterBodyPromotion().promote(
+                acceptedTahoe,
+                decision: reviewDecision,
+                id: "unsafe",
+                region: "Unknown",
+                reviewedBindings: [binding]
+            )
+            Check.expect(false, "needs-review candidate was promoted")
+        } catch {
+            Check.equal(error as? ReviewedWaterBodyPromotionError, .candidateNotAccepted)
+        }
+    }
+
+    Check.test("resolution evidence round trips for review artifacts") {
+        let data = try! JSONEncoder().encode(acceptedTahoe)
+        let decoded = try! JSONDecoder().decode(WaterBodyResolutionCandidate.self, from: data)
+        Check.equal(decoded, acceptedTahoe)
+    }
+}
+
 exit(Check.report())

@@ -47,7 +47,7 @@ public enum HydroCoverageAvailability: String, Sendable, Equatable {
     case unavailable
 }
 
-public enum WaterBodyKind: String, Sendable, Equatable {
+public enum WaterBodyKind: String, Sendable, Equatable, Codable {
     case bay
     case ocean
     case sound
@@ -57,7 +57,7 @@ public enum WaterBodyKind: String, Sendable, Equatable {
     case gulf
 }
 
-public enum HydroCapability: String, Sendable, Equatable, Hashable, CaseIterable {
+public enum HydroCapability: String, Sendable, Equatable, Hashable, CaseIterable, Codable {
     case waterLevel
     case waterTemperature
     case wind

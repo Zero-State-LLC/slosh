@@ -115,6 +115,16 @@ unreviewed candidate is not a `WaterBody`. Distance is a ranking signal only
 after positive same-water-body evidence, never an identity rule. See
 [RW4C_GEOGRAPHIC_DISCOVERY_RESEARCH.md](RW4C_GEOGRAPHIC_DISCOVERY_RESEARCH.md).
 
+RW4D implements that portable research boundary without adding product discovery.
+`WaterBodyResolutionCandidate` carries an optional authoritative feature,
+provider-independent observation candidates, and explicit evidence.
+`WaterBodyResolutionEvaluator` returns `accepted`, `needsReview`, `rejected`, or
+`notComputable`; proximity is never sufficient for acceptance and conflicting
+feature evidence rejects even a nearer station. A fixture provider makes the
+policy deterministic and network-free. `ReviewedWaterBodyPromotion` separately
+requires an accepted decision and reviewed source bindings before a candidate can
+become a `WaterBody`.
+
 ## Rendering
 
 ### Physical validation instrumentation

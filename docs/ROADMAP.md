@@ -241,11 +241,16 @@ relevant product foundation is sound.
   but none makes nearest sensor equivalent to same water body. Trustworthy
   resolution requires authoritative feature identity, class-specific evidence,
   explicit confidence, and review. Automatic discovery remains unimplemented.
-- **Next: RW4D — Resolution Candidate Prototype.** Add fixture-backed candidate,
-  evidence, and confidence contracts; prove adversarial nearest-station rejection;
-  and keep all discovery behind DEBUG/research tooling. Do not create runtime
-  product Places yet. See
+- **RW4D complete:** provider-independent feature/source candidate, evidence,
+  confidence, fixture-provider, and reviewed-promotion contracts now prove an
+  accepted inland case, adversarial nearest-station rejection, coastal
+  `needsReview`, unsupported `notComputable`, and JSON review artifacts. No live
+  discovery or product UI exists. See
   [RW4C_GEOGRAPHIC_DISCOVERY_RESEARCH.md](RW4C_GEOGRAPHIC_DISCOVERY_RESEARCH.md).
+- **Next: RW4E — Provider Metadata Candidate Adapters.** Add DEBUG/research-only
+  NOAA CO-OPS and USGS metadata adapters that return observation candidates and
+  raw evidence, never automatic `WaterBody` values. Keep geographic feature
+  resolution fixture-backed until an authoritative query/index is selected.
 
 ### RW5 — Historical playback
 

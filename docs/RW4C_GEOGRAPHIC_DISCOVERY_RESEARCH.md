@@ -251,6 +251,11 @@ The next engineering slice should be **RW4D — Resolution Candidate Prototype**
 6. output a review artifact containing all evidence and rejection reasons;
 7. do not expose arbitrary selection in normal product UI.
 
+**Implementation status:** complete. RW4D added the provider-independent
+candidate/evidence/confidence model, deterministic evaluator, fixture provider,
+explicit reviewed-promotion gate, JSON artifact encoding, and adversarial tests.
+It intentionally added no live metadata adapters or product UI.
+
 Suggested acceptance cases:
 
 - Lake Tahoe point resolves to the Tahoe feature and reviewed USGS site candidate;

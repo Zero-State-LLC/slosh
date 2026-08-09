@@ -58,6 +58,13 @@ must first identify an authoritative geographic feature, gather provider
 candidates, evaluate same-water-body evidence, and preserve explicit
 `needsReview` and `notComputable` outcomes.
 
+RW4D now provides fixture-backed candidate, evidence, confidence, and promotion
+contracts in `OceanCore`. The prototype proves that a nearby Truckee River site
+cannot replace a Lake Tahoe source, coastal name/proximity evidence remains
+`needsReview`, unsupported coordinates remain `notComputable`, and only accepted
+candidates with separately reviewed bindings can be promoted. It performs no
+live discovery and is not exposed in the iPhone product UI.
+
 ## Two domains
 
 - **Experiences** are the existing authored `OceanTheme` modes. They define a

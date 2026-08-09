@@ -60,7 +60,7 @@ Arbitrary geographic discovery is not implemented.
 | Builds and runs on the watchOS simulator | ✅ |
 | All fifteen modes render | ✅ |
 | iPhone curated list and geographic map | ✅ |
-| Automated checks (`swift run oceancheck`) | ✅ 382 assertions |
+| Automated checks (`swift run oceancheck`) | ✅ 391 assertions |
 | **Run on physical hardware** | ❌ **never** |
 | Frame rate and battery profiled | ❌ |
 | Submitted to the App Store | ❌ |
@@ -115,9 +115,9 @@ swift run providercheck
 The provider suite is offline by default. `swift run providercheck --live` adds
 an observational, non-deterministic NOAA smoke test.
 
-382 assertions over flow direction, surge, ripples, rain, lightning, the bowl
+391 assertions over flow direction, surge, ripples, rain, lightning, the bowl
 centre, mode catalogue, physical-validation metrics, and curated Places
-selection/map contracts.
+selection/map contracts, including adversarial geographic-resolution policy.
 
 **Why not XCTest.** XCTest ships only inside Xcode. Writing the suite as a plain
 executable means it runs anywhere the Swift toolchain does — including CI images
