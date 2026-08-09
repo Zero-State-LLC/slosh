@@ -37,7 +37,7 @@ public actor LiveHydroCoordinator {
                 state: state,
                 experience: HydroInterpreter().interpret(state, referenceDate: referenceDate)
             )
-        } catch is CancellationError {
+        } catch where isCancellation(error) {
             // Backgrounding or reduced luminance cancels the in-flight request.
             // A canceled request did not refresh anything and must not suppress
             // the next foreground activation for the normal ten-minute window.

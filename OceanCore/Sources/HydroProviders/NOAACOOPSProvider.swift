@@ -73,13 +73,18 @@ public struct NOAACOOPSProvider<Transport: NOAADataTransport>: HydroStateProvide
 
         for request in requests(for: waterBody) {
             do {
+                // Checked per request, not only per error. A cancellation that
+                // lands between two requests produces no error at all, and
+                // without this the loop would work through every remaining
+                // station after the wrist has already dropped.
+                try Task.checkCancellation()
                 guard let url = request.url else { throw NOAAProviderError.invalidRequest }
                 let data = try await transport.data(from: url)
                 let sample = try NOAAHydroAdapter.decode(
                     data, product: request.product, stationID: request.stationID
                 )
                 if sample.hasMeasurement { samples.append(sample) }
-            } catch is CancellationError {
+            } catch where isCancellation(error) {
                 sawCancellation = true
                 break
             } catch {
