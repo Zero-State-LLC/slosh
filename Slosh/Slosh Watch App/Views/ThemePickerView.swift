@@ -147,6 +147,7 @@ private struct PlacePage: View {
         case .loading: return "Loading latest observations…"
         case let .loaded(status): return liveSummary(status)
         case let .preserved(status): return "Using last observation · \(ageSummary(status))"
+        case let .failed(_, reason): return reason
         case .unavailable: return "Live data unavailable"
         }
     }
@@ -236,6 +237,7 @@ private struct PlaceStatusView: View {
         return switch loadState {
         case .loading: "Loading latest observations…"
         case .preserved: "Using last observation"
+        case let .failed(_, reason): reason
         case .unavailable: "Live data unavailable"
         case let .loaded(status): HydroPresentationFormatter.freshness(status.freshness)
         case .inactive: "Reviewed capability"

@@ -281,13 +281,21 @@ public enum RealWaterLoadState: Sendable, Equatable {
     case loading(WaterBody.ID)
     case loaded(PlaceHydroStatus)
     case preserved(PlaceHydroStatus)
+    case failed(WaterBody.ID, String)
     case unavailable(WaterBody.ID)
 
     public var waterBodyID: WaterBody.ID? {
         switch self {
         case .inactive: nil
-        case let .loading(id), let .unavailable(id): id
+        case let .loading(id), let .failed(id, _), let .unavailable(id): id
         case let .loaded(status), let .preserved(status): status.waterBodyID
+        }
+    }
+
+    public var failureReason: String? {
+        switch self {
+        case let .failed(_, reason): reason
+        default: nil
         }
     }
 
