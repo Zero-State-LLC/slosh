@@ -16,7 +16,7 @@ final class OceanModel {
 
     private let source: MotionSource
 
-    init(theme: OceanTheme) {
+    init(theme: OceanTheme, hydroExperience: HydroExperience? = nil) {
         // The watch simulator has no motion sensors, so there the water is
         // driven by a drag gesture instead. Everything downstream is identical.
         #if targetEnvironment(simulator)
@@ -29,6 +29,7 @@ final class OceanModel {
         scene.scaleMode = .resizeFill
         scene.motionSource = source
         scene.theme = theme
+        apply(hydroExperience: hydroExperience)
     }
 
     /// Non-nil only in the simulator, where drags stand in for the wrist.
@@ -60,6 +61,11 @@ final class OceanModel {
 
     func apply(energy: Double) {
         scene.energy = energy
+    }
+
+    func apply(hydroExperience: HydroExperience?) {
+        scene.environmentalForcing = hydroExperience?.forcing
+        scene.hydroThemeModifiers = hydroExperience?.themeModifiers
     }
 
     func tapped() {

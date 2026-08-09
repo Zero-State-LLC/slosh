@@ -5,6 +5,20 @@ import SwiftUI
 /// The whole app: water, edge to edge, with the controls hidden in the
 /// hardware. Tilt it, shake it, tap it, turn the crown.
 struct RootView: View {
+    /// Synthetic fixtures exist only for deterministic simulator QA. They all
+    /// use Calm ocean, so captures compare environmental state rather than
+    /// authored themes. Release and physical-watch builds compile this to nil.
+    private static let debugHydroExperience: HydroExperience? = {
+        #if DEBUG && targetEnvironment(simulator)
+        guard let name = UserDefaults.standard.string(forKey: "hydroFixture") else {
+            return nil
+        }
+        return HydroFixtures.experience(named: name)
+        #else
+        return nil
+        #endif
+    }()
+
     @AppStorage(SettingsKey.themeID) private var themeID = OceanTheme.calmOcean.id
     @AppStorage(SettingsKey.energy) private var storedEnergy = EnergyRange.default
     @AppStorage(SettingsKey.hapticsEnabled) private var hapticsEnabled = true
@@ -12,7 +26,10 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.isLuminanceReduced) private var isLuminanceReduced
 
-    @State private var model = OceanModel(theme: .theme(id: OceanTheme.calmOcean.id))
+    @State private var model = OceanModel(
+        theme: .calmOcean,
+        hydroExperience: RootView.debugHydroExperience
+    )
     @State private var crownEnergy = EnergyRange.default
 
     /// `simctl launch … -startInPicker YES` opens straight to the picker.
@@ -26,7 +43,9 @@ struct RootView: View {
         #endif
     }()
 
-    private var theme: OceanTheme { .theme(id: themeID) }
+    private var theme: OceanTheme {
+        RootView.debugHydroExperience == nil ? .theme(id: themeID) : .calmOcean
+    }
 
     var body: some View {
         // The NavigationStack is not for navigation — watchOS only renders a
@@ -63,6 +82,7 @@ struct RootView: View {
         .onAppear {
             crownEnergy = storedEnergy
             model.apply(theme: theme)
+            model.apply(hydroExperience: RootView.debugHydroExperience)
             model.apply(energy: storedEnergy)
             model.haptics.isEnabled = hapticsEnabled
             model.startRunning()

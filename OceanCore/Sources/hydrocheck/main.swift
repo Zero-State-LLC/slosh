@@ -28,6 +28,10 @@ let referenceDate = HydroFixtures.referenceDate
 let calm = interpreter.interpret(HydroFixtures.calm, referenceDate: referenceDate)
 let active = interpreter.interpret(HydroFixtures.active, referenceDate: referenceDate)
 let severe = interpreter.interpret(HydroFixtures.severe, referenceDate: referenceDate)
+Check.expect(HydroFixtures.experience(named: "calm") == calm, "calm fixture name must resolve")
+Check.expect(HydroFixtures.experience(named: "active") == active, "active fixture name must resolve")
+Check.expect(HydroFixtures.experience(named: "severe") == severe, "severe fixture name must resolve")
+Check.expect(HydroFixtures.experience(named: "unknown") == nil, "unknown fixture name must remain nil")
 
 Check.expect(
     interpreter.interpret(HydroFixtures.active, referenceDate: referenceDate) == active,
@@ -357,7 +361,47 @@ Check.equal(
 
 let baseTheme = OceanTheme.calmOcean
 let originalTheme = baseTheme
-let resolvedStyle = ResolvedWaterStyle(base: baseTheme, modifiers: severe.themeModifiers)
+let authoredStyle = ResolvedWaterStyle(base: baseTheme, modifiers: nil)
+Check.equal(authoredStyle.choppiness, baseTheme.choppiness, "nil style must preserve choppiness")
+Check.equal(authoredStyle.turbulence, baseTheme.turbulence, "nil style must preserve turbulence")
+Check.equal(
+    authoredStyle.crestSharpness,
+    baseTheme.crestSharpness,
+    "nil style must preserve crest sharpness"
+)
+Check.equal(authoredStyle.foaminess, baseTheme.foaminess, "nil style must preserve foaminess")
+Check.equal(
+    authoredStyle.causticStrength,
+    baseTheme.causticStrength,
+    "nil style must preserve caustic strength"
+)
+Check.equal(authoredStyle.glitter, baseTheme.glitter, "nil style must preserve glitter")
+
+let calmStyle = ResolvedWaterStyle(base: baseTheme, modifiers: calm.themeModifiers)
+let activeStyle = ResolvedWaterStyle(base: baseTheme, modifiers: active.themeModifiers)
+let severeStyle = ResolvedWaterStyle(base: baseTheme, modifiers: severe.themeModifiers)
+Check.expect(
+    calmStyle.choppiness < activeStyle.choppiness
+        && activeStyle.choppiness < severeStyle.choppiness,
+    "resolved choppiness must order calm < active < severe"
+)
+Check.expect(
+    calmStyle.turbulence < activeStyle.turbulence
+        && activeStyle.turbulence < severeStyle.turbulence,
+    "resolved turbulence must order calm < active < severe"
+)
+Check.expect(
+    calmStyle.crestSharpness < activeStyle.crestSharpness
+        && activeStyle.crestSharpness < severeStyle.crestSharpness,
+    "resolved crest sharpness must order calm < active < severe"
+)
+Check.expect(
+    calmStyle.foaminess < activeStyle.foaminess
+        && activeStyle.foaminess < severeStyle.foaminess,
+    "resolved foaminess must order calm < active < severe"
+)
+
+let resolvedStyle = severeStyle
 Check.expect(baseTheme == originalTheme, "resolving style must not mutate OceanTheme")
 Check.expect(
     (0...2.5).contains(resolvedStyle.choppiness)
@@ -368,13 +412,48 @@ Check.expect(
         && (0...3.5).contains(resolvedStyle.glitter),
     "resolved style fields must respect renderer-specific bounds"
 )
+Check.expect(
+    (0..<20).allSatisfy { _ in
+        ResolvedWaterStyle(base: baseTheme, modifiers: active.themeModifiers) == activeStyle
+    },
+    "resolved style must be deterministic"
+)
+Check.expect(
+    severeStyle.choppiness < 1.2
+        && severeStyle.turbulence < 0.5
+        && severeStyle.crestSharpness < 0.5
+        && severeStyle.foaminess < 0.5,
+    "severe fixture must remain below visual saturation thresholds"
+)
+
+let poisonedModifiers = HydroThemeModifiers(
+    choppiness: .nan,
+    turbulence: .infinity,
+    crestSharpness: -.infinity,
+    foaminess: .nan,
+    causticStrength: .infinity,
+    glitter: .nan
+)
+let safeStyle = ResolvedWaterStyle(base: baseTheme, modifiers: poisonedModifiers)
+Check.expect(
+    [
+        safeStyle.choppiness, safeStyle.turbulence, safeStyle.crestSharpness,
+        safeStyle.foaminess, safeStyle.causticStrength, safeStyle.glitter,
+    ].allSatisfy(\.isFinite),
+    "non-finite modifiers must not poison resolved style"
+)
 
 let repeated = (0..<20).map { _ in interpreter.interpret(HydroFixtures.severe, referenceDate: referenceDate) }
 Check.expect(repeated.allSatisfy { $0 == severe }, "fixture output must be deterministic across repeated runs")
 
 print("Hydro fixtures:")
-for (name, experience) in [("calm", calm), ("active", active), ("severe", severe)] {
+for (name, experience, style) in [
+    ("calm", calm, calmStyle),
+    ("active", active, activeStyle),
+    ("severe", severe, severeStyle),
+] {
     print("  \(name): energy=\(experience.forcing.energy), chop=\(experience.forcing.chop), turbulence=\(experience.forcing.turbulence)")
+    print("    style: chop=\(style.choppiness), turbulence=\(style.turbulence), crest=\(style.crestSharpness), foam=\(style.foaminess), caustics=\(style.causticStrength), glitter=\(style.glitter)")
 }
 
 if Check.failures.isEmpty {
