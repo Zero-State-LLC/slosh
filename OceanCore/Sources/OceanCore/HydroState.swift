@@ -51,20 +51,31 @@ public struct HydroMeasurement: Sendable, Equatable {
     public var origin: HydroOrigin
     public var quality: HydroQuality
     public var sourceID: String
+    /// Required for directional measurements. The interpreter converts both
+    /// conventions to canonical direction-of-forcing-toward radians.
+    public var directionConvention: HydroDirectionConvention?
 
     public init(
         value: Double,
         unit: HydroUnit,
         origin: HydroOrigin,
         quality: HydroQuality,
-        sourceID: String
+        sourceID: String,
+        directionConvention: HydroDirectionConvention? = nil
     ) {
         self.value = value
         self.unit = unit
         self.origin = origin
         self.quality = quality
         self.sourceID = sourceID
+        self.directionConvention = directionConvention
     }
+}
+
+/// Whether a reported bearing names where a force travels or where it came from.
+public enum HydroDirectionConvention: String, Sendable, Equatable {
+    case toward
+    case from
 }
 
 public enum HydroUnit: String, Sendable, Equatable {

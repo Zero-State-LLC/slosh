@@ -5,11 +5,13 @@ public struct EnvironmentalForcing: Sendable, Equatable {
     public private(set) var energy: Double
     public private(set) var chop: Double
     public private(set) var turbulence: Double
+    /// Direction the current force moves toward, in radians.
     public private(set) var flowDirection: Double?
     public private(set) var flowStrength: Double
     public private(set) var waveAmplitude: Double
     public private(set) var waveRate: Double
     public private(set) var foamPotential: Double
+    /// Direction the wind force moves toward, in radians.
     public private(set) var windDirection: Double?
     public private(set) var windStrength: Double
     public private(set) var freshness: HydroFreshness
@@ -47,7 +49,9 @@ public struct EnvironmentalForcing: Sendable, Equatable {
 
     private static func finiteDirection(_ value: Double?) -> Double? {
         guard let value, value.isFinite else { return nil }
-        return value
+        let turn = 2 * Double.pi
+        let reduced = value.truncatingRemainder(dividingBy: turn)
+        return reduced < 0 ? reduced + turn : reduced
     }
 }
 

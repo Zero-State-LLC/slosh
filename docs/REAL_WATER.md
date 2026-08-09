@@ -25,15 +25,62 @@ Provider DTO → HydroState → HydroInterpreter → HydroExperience
 normalized `EnvironmentalForcing` and renderer-vocabulary-only
 `HydroThemeModifiers`. Provider DTOs never enter `OceanCore`.
 
-## Interaction rule
+## Interaction and composition rule
 
 **Environmental data is persistent forcing. Wrist movement is transient
 forcing.**
 
-The future `SurfaceDriver` integration must blend the two. Environmental flow
-should persist while the watch is still, wrist tilt should temporarily bias the
-water, and a shake should add a surge that decays back toward the environmental
-state. Real Water must not eliminate wrist interaction.
+`SurfaceDriver` now composes the three influences as:
+
+- **environmental forcing = persistent baseline**;
+- **wrist gravity = temporary directional authority**;
+- **shake = transient surge**.
+
+Environmental energy does not overwrite crown energy. The implemented bounded
+composition is:
+
+```text
+resolvedEnergy = min(
+  crownEnergy
+  + 0.65 × environmentalEnergy
+  + 0.15 × environmentalTurbulence
+  + 0.10 × currentStrength
+  + 0.10 × windStrength,
+  3.0
+)
+```
+
+With no environmental forcing, `resolvedEnergy` is exactly the existing crown
+energy and authored behavior is unchanged. Shake surge remains separate and
+decays without erasing the environmental baseline.
+
+For direction, in-plane gravity is mapped from a dead zone of `0.12` to full
+wrist authority at `0.75`. A flat watch targets the environmental current
+direction. Increasing tilt blends along the shortest angular path toward the
+wrist direction, and returning flat smoothly targets the environmental
+direction again. Authored modes that do not follow gravity, especially Zero
+Gravity, retain their authored heading behavior.
+
+## Direction convention
+
+Hydro directional measurements carry an explicit convention: **toward** or
+**from**. `HydroInterpreter` converts both into one canonical contract:
+
+> All `EnvironmentalForcing` directions mean the direction the force moves
+> toward, in radians normalized to one full turn.
+
+A direction without an explicit convention is unusable rather than guessed.
+
+## Quality handling
+
+Measurement quality affects interpretation while the source measurement remains
+unchanged in `HydroState`:
+
+```text
+good    → used
+unknown → used
+suspect → ignored by HydroInterpreter
+```
 
 ## Provenance rule
 
@@ -47,6 +94,11 @@ plumbing must clearly distinguish:
 - **derived** values calculated from identified inputs and a documented rule;
 - **stale** state whose observation age exceeds the freshness threshold;
 - **unavailable** state with no usable observation.
+
+Freshness permits at most five minutes of future clock skew. An observation
+exactly five minutes ahead is evaluated normally; one farther in the future is
+`unavailable`. `SurfaceDriver` does not apply unavailable forcing. Freshness
+remains deterministic because interpretation always receives a reference date.
 
 ## Observation rate is not render rate
 
