@@ -902,6 +902,14 @@ Check.expect(
     "uncached failure must publish unavailable status"
 )
 
+let failedState = RealWaterLoadState.failed(bodyB.id, "Real Water unavailable on watch")
+Check.expect(
+    failedState == .failed(bodyB.id, "Real Water unavailable on watch")
+        && failedState.waterBodyID == bodyB.id
+        && failedState.failureReason == "Real Water unavailable on watch",
+    "failed watch-state must retain place identity and reason"
+)
+
 print("Hydro fixtures:")
 for (name, experience, style) in [
     ("calm", calm, calmStyle),
