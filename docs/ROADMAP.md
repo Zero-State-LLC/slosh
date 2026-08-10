@@ -157,6 +157,11 @@ Only worth doing if Phase 4 shows any traction.
 
 ## Future track — Real Water
 
+The canonical representative-water doctrine is now in
+[PRODUCT_DOCTRINE.md](PRODUCT_DOCTRINE.md). Future Real Water work must preserve
+truthful inputs, explicit uncertainty, no nearest-sensor guessing, no fabricated
+missing data, and no exact-simulation claims.
+
 This track does not weaken **Phase 0**. Physical-watch validation remains the
 blocking platform-risk gate, and no network-backed product work should be used
 to defer it. The phases below are planned, not shipped, and begin only after the
@@ -264,13 +269,17 @@ relevant product foundation is sound.
   offshore `notComputable`, deterministic geometry semantics, malformed-polygon fail-closed behavior, and the
   single-ring/no-MultiPolygon prototype constraint are covered. No product UI,
   arbitrary map selection, live NHD download, or catalog promotion was added.
-- **Next: RW4G — Feature + Observation Candidate Composition & Confidence Calibration.**
-  Expand authoritative-feature and observation fixtures across water-body classes,
-  then calibrate explicit evidence thresholds for `accepted`, `needsReview`,
-  `rejected`, and `notComputable`. Keep arbitrary geographic discovery in research
-  tooling until that calibration, a real authoritative feature service/index, a
-  review workflow, and Phase 0 evidence are available. Do not jump directly to
-  production arbitrary selection.
+- **RW4G complete:** feature/source evidence evaluation is separate from pure
+  deterministic policy. Lake/reservoir, river/stream, and bay/estuary/coastal
+  policies exist; hard blockers cannot be outweighed by weak evidence;
+  `needsReview` and `notComputable` remain first-class outcomes. The calibration
+  corpus includes adversarial nearest-sensor cases, deterministic review artifacts,
+  aggregate counts, automatic-acceptance precision, and a zero false-automatic-accept
+  safety metric.
+- **Next: RW4H — Reviewed Discovery Promotion Workflow.** Take a RW4G resolution
+  artifact through human/reviewer approval, verify products, declare complete
+  coverage, create source bindings, and only then promote a canonical `WaterBody`.
+  Do not add arbitrary product map selection or automatic persistent Places.
 
 ### RW5 — Historical playback
 

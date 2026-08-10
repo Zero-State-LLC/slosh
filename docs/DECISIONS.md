@@ -192,3 +192,32 @@ Successful states merge deterministically in declared route order, with no
 fabricated fields. Selecting a new place clears the previously applied Hydro
 experience before fetching, so one place is never shown using another place's
 forcing while the replacement is loading or unavailable.
+
+---
+
+## 13. Source representativeness before environmental forcing
+
+**Decision:** an observation source may drive a Place only after deterministic
+resolution policy finds sufficient evidence that it represents the selected body
+of water.
+
+The renderer is intentionally expressive, but its inputs must be truthful.
+Slosh is not an exact hydrodynamic simulation, a navigation tool, or a marine
+safety instrument; it is a stylized representation grounded in evidence. That
+means source identity is load-bearing. Proximity, station name, or HUC can help
+rank or review candidates, but they cannot by themselves establish
+representativeness.
+
+RW4G keeps this policy upstream of rendering. `CandidateEvidenceEvaluator`
+normalizes collected evidence; `ResolutionPolicy` applies pure class-specific
+rules for lakes/reservoirs, rivers/streams, and bays/estuaries/coastal waters.
+Hard blockers such as wrong feature, wrong water-body class, distinct basin,
+disconnected network, wrong tributary, missing required product, or explicit
+metadata conflict force rejection and cannot be outweighed by accumulated weak
+evidence.
+
+**Consequence:** `HydroInterpreter`, `SurfaceDriver`, and the shader continue to
+consume provider-independent state. They do not know about NOAA, USGS, NHD,
+station selection, or confidence thresholds. Accepted representativeness is also
+separate from signal coverage: a trustworthy source may still support only water
+level, and missing capabilities remain unavailable.

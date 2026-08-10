@@ -303,8 +303,15 @@ rules, explicit uncertainty, and likely precomputed geospatial support.
 Phase 0 remains **OPEN / NOT_RUN**. This research provides no physical Watch
 evidence.
 
-The exact recommended next slice is **RW4G — Feature + Observation Candidate
-Composition & Confidence Calibration**. It should broaden deterministic fixture
-coverage and calibrate when explicit identity, class, hydrologic, and product
-evidence support `accepted` versus `needsReview`, without exposing arbitrary map
-selection in product UI.
+**RW4G implementation status:** complete. The calibrated resolution policy keeps
+evidence normalization separate from deterministic class-specific policy, covers
+lake/reservoir, river/stream, and bay/estuary/coastal cases, preserves
+`accepted`, `needsReview`, `rejected`, and `notComputable`, and emits deterministic
+review artifacts through `resolutioncheck`. The calibration corpus is
+precision-oriented: false automatic accepts must remain zero, and distance, HUC,
+or name evidence alone can never accept.
+
+The exact recommended next slice is **RW4H — Reviewed Discovery Promotion
+Workflow**. It should take a RW4G review artifact through human approval, product
+verification, complete coverage declaration, reviewed source bindings, and only
+then canonical `WaterBody` promotion.

@@ -1,6 +1,27 @@
 # Real Water
 
-> **Slosh lets you wear the state of a real body of water.**
+> **Slosh lets you wear a stylized, evidence-grounded representation of the current state of a real body of water.**
+
+Real Water is governed by the canonical
+[Product Doctrine](PRODUCT_DOCTRINE.md): environmental representation is not a
+scientific hydrodynamic simulation. Slosh is not CFD, a navigation tool, a
+marine safety instrument, or an exact local model. It is expressive water driven
+only by trustworthy environmental evidence.
+
+The source rule is literal: a data source may drive Slosh only when there is
+sufficient evidence that it represents the selected water body. Proximity alone
+is never enough. Missing signals remain missing. Uncertain source relationships
+stay `needsReview` or `notComputable`.
+
+The pipeline is:
+
+```text
+provider observation
+→ normalized evidence
+→ HydroState
+→ perceptual interpretation
+→ stylized visual
+```
 
 Real Water is a planned product domain. It extends Slosh without replacing the
 authored experiences that already define the app.
@@ -91,6 +112,19 @@ outside excludes, boundary contains for candidate generation, malformed polygons
 fail closed, and MultiPolygon input is excluded from the prototype. No arbitrary
 map selection, product UI, live NHD fetch, or new Place is shipped.
 
+RW4G calibrates the truth gate between authoritative features and observation
+candidates. Evidence collection and policy are separate: `CandidateEvidenceEvaluator`
+normalizes the evidence, while `ResolutionPolicy` applies deterministic
+class-specific rules for lake/reservoir, river/stream, and bay/estuary/coastal
+features. The calibration corpus intentionally favors false-positive prevention:
+distance, HUC, and name evidence never accept by themselves; hard blockers such
+as wrong feature, wrong class, land barrier, disconnected network, wrong
+tributary, missing required product, or explicit metadata conflict cannot be
+outweighed by weak positives. `resolutioncheck` emits deterministic RW4G review
+artifacts and currently reports zero false automatic accepts. RW4G still adds no
+normal product UI, no arbitrary map selection, and no automatic WaterBody
+promotion.
+
 ## Two domains
 
 - **Experiences** are the existing authored `OceanTheme` modes. They define a
@@ -100,11 +134,19 @@ map selection, product UI, live NHD fetch, or new Place is shipped.
 
 ## Data boundary
 
-Provider-specific data stops before the portable engine:
+Provider-specific data stops before the portable engine. Source confidence and
+signal coverage are tracked separately before rendering:
 
 ```text
-Provider DTO → HydroState → HydroInterpreter → HydroExperience
+Provider DTO → normalized evidence → HydroState → HydroInterpreter → HydroExperience
 ```
+
+- **Source confidence:** are these observations representative of the selected
+  water body?
+- **Coverage:** which environmental variables are actually observed?
+
+A representative source may support only water level. Acceptance never implies
+complete Hydro coverage.
 
 `HydroState` retains measurement units, origin, quality, and source identity.
 `HydroInterpreter` deterministically translates valid measurements into

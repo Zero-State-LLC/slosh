@@ -70,7 +70,13 @@ public enum ResolutionEvidenceKind: String, Sendable, Equatable, Codable {
     case selectedPointContainedByFeature
     case sourceContainedByFeature
     case sourceExplicitlyReferencesFeature
+    case reviewedSourceRelationship
+    case sameAuthoritativeReach
+    case upstreamDownstreamRelationship
+    case upstreamDownstreamAmbiguous
+    case tributaryIdentity
     case hydrologicallyConnected
+    case sameHydrologicUnit
     case compatibleWaterBodyClass
     case productAvailable
     case nameAgreement
@@ -81,7 +87,55 @@ public enum ResolutionEvidenceKind: String, Sendable, Equatable, Codable {
     case authoritativeHydrologicID
     case providerSourceVersion
     case conflictingFeature
+    case wrongWaterBodyClass
+    case landBarrierOrDistinctBasin
+    case disconnectedNetwork
+    case wrongTributary
+    case sourceLacksRequiredProduct
+    case explicitMetadataConflict
     case unsupportedRegion
+    case malformedEvidenceSource
+    case sourceCoordinateUnavailable
+}
+
+public enum ResolutionEvidenceStrength: String, Sendable, Equatable, Codable {
+    case required
+    case identity
+    case strong
+    case supporting
+    case weakRankingOnly
+    case hardBlocker
+    case notComputable
+}
+
+extension ResolutionEvidenceKind {
+    public var strength: ResolutionEvidenceStrength {
+        switch self {
+        case .productAvailable:
+            return .required
+        case .sourceContainedByFeature, .sourceExplicitlyReferencesFeature,
+             .reviewedSourceRelationship, .sameAuthoritativeReach:
+            return .identity
+        case .selectedPointContainedByFeature, .compatibleWaterBodyClass,
+             .upstreamDownstreamRelationship, .tributaryIdentity:
+            return .strong
+        case .hydrologicallyConnected, .sameHydrologicUnit, .upstreamDownstreamAmbiguous,
+             .geometryDatasetVersion, .authoritativeFeatureClass,
+             .authoritativeFeatureName, .authoritativeHydrologicID,
+             .providerSourceVersion:
+            return .supporting
+        case .nameAgreement:
+            return .supporting
+        case .proximityOnly:
+            return .weakRankingOnly
+        case .conflictingFeature, .wrongWaterBodyClass, .landBarrierOrDistinctBasin,
+             .disconnectedNetwork, .wrongTributary, .sourceLacksRequiredProduct,
+             .explicitMetadataConflict:
+            return .hardBlocker
+        case .unsupportedRegion, .malformedEvidenceSource, .sourceCoordinateUnavailable:
+            return .notComputable
+        }
+    }
 }
 
 public struct ResolutionEvidence: Sendable, Equatable, Codable {
@@ -129,18 +183,89 @@ public struct WaterBodyResolutionDecision: Sendable, Equatable, Codable {
     }
 }
 
-/// Deterministic evidence policy. Distance may order otherwise-valid candidates,
-/// but proximity never establishes water-body identity.
-public struct WaterBodyResolutionEvaluator: Sendable {
+public enum ResolutionPolicyClass: String, Sendable, Equatable, Codable {
+    case lakeReservoir
+    case riverStream
+    case bayEstuaryCoastal
+    case unsupportedUnknown
+}
+
+public struct CandidateEvidenceEvaluation: Sendable, Equatable, Codable {
+    public let policyClass: ResolutionPolicyClass
+    public let evidenceKinds: Set<ResolutionEvidenceKind>
+    public let hardBlockers: [ResolutionEvidence]
+    public let notComputableEvidence: [ResolutionEvidence]
+
+    public init(
+        policyClass: ResolutionPolicyClass,
+        evidenceKinds: Set<ResolutionEvidenceKind>,
+        hardBlockers: [ResolutionEvidence],
+        notComputableEvidence: [ResolutionEvidence]
+    ) {
+        self.policyClass = policyClass
+        self.evidenceKinds = evidenceKinds
+        self.hardBlockers = hardBlockers
+        self.notComputableEvidence = notComputableEvidence
+    }
+
+    public func contains(_ kind: ResolutionEvidenceKind) -> Bool {
+        evidenceKinds.contains(kind)
+    }
+}
+
+/// Normalizes collected evidence without applying acceptance thresholds. This
+/// keeps provider/feature facts separate from the deterministic product policy.
+public struct CandidateEvidenceEvaluator: Sendable {
     public init() {}
 
-    public func evaluate(_ candidate: WaterBodyResolutionCandidate) -> WaterBodyResolutionDecision {
+    public func evaluate(_ candidate: WaterBodyResolutionCandidate) -> CandidateEvidenceEvaluation {
         let kinds = Set(candidate.evidence.map(\.kind))
-        if kinds.contains(.unsupportedRegion) {
-            return .init(confidence: .notComputable, reasons: ["No supported authoritative feature/provider coverage"])
+        return CandidateEvidenceEvaluation(
+            policyClass: Self.policyClass(for: candidate.feature),
+            evidenceKinds: kinds,
+            hardBlockers: candidate.evidence
+                .filter { $0.kind.strength == .hardBlocker }
+                .sorted(by: evidenceOrder),
+            notComputableEvidence: candidate.evidence
+                .filter { $0.kind.strength == .notComputable }
+                .sorted(by: evidenceOrder)
+        )
+    }
+
+    private static func policyClass(for feature: GeographicFeatureIdentity?) -> ResolutionPolicyClass {
+        guard let feature else { return .unsupportedUnknown }
+        switch feature.kind {
+        case .lake:
+            return .lakeReservoir
+        case .river:
+            return .riverStream
+        case .bay, .estuary, .ocean, .sound, .gulf:
+            return .bayEstuaryCoastal
         }
-        if kinds.contains(.conflictingFeature) {
-            return .init(confidence: .rejected, reasons: ["Candidate source belongs to a conflicting geographic feature"])
+    }
+
+    private func evidenceOrder(_ lhs: ResolutionEvidence, _ rhs: ResolutionEvidence) -> Bool {
+        if lhs.kind.rawValue != rhs.kind.rawValue { return lhs.kind.rawValue < rhs.kind.rawValue }
+        if lhs.source != rhs.source { return lhs.source < rhs.source }
+        return lhs.note < rhs.note
+    }
+}
+
+/// Pure class-specific resolution policy. It consumes normalized evidence and
+/// returns the existing decision vocabulary; weak evidence such as distance, name,
+/// or HUC can never accumulate into automatic acceptance.
+public struct ResolutionPolicy: Sendable {
+    public init() {}
+
+    public func decide(
+        candidate: WaterBodyResolutionCandidate,
+        evaluation: CandidateEvidenceEvaluation
+    ) -> WaterBodyResolutionDecision {
+        if !evaluation.notComputableEvidence.isEmpty {
+            return .init(
+                confidence: .notComputable,
+                reasons: evaluation.notComputableEvidence.map(\.note).sorted()
+            )
         }
         guard candidate.feature != nil else {
             return .init(confidence: .notComputable, reasons: ["No authoritative geographic feature resolved"])
@@ -148,23 +273,92 @@ public struct WaterBodyResolutionEvaluator: Sendable {
         guard !candidate.observationSources.isEmpty else {
             return .init(confidence: .notComputable, reasons: ["No observation source candidates found"])
         }
-
-        let hasFeatureContainment = kinds.contains(.selectedPointContainedByFeature)
-        let hasCompatibleClass = kinds.contains(.compatibleWaterBodyClass)
-        let hasProduct = kinds.contains(.productAvailable)
-        let hasIdentityLink = kinds.contains(.sourceContainedByFeature)
-            || kinds.contains(.sourceExplicitlyReferencesFeature)
-        if hasFeatureContainment && hasCompatibleClass && hasProduct && hasIdentityLink {
+        if !evaluation.hardBlockers.isEmpty {
             return .init(
-                confidence: .accepted,
-                reasons: ["Authoritative feature and observation source identity evidence agree"]
+                confidence: .rejected,
+                reasons: evaluation.hardBlockers.map(\.note).sorted()
             )
         }
 
+        switch evaluation.policyClass {
+        case .lakeReservoir:
+            return lakeReservoirDecision(evaluation)
+        case .riverStream:
+            return riverStreamDecision(evaluation)
+        case .bayEstuaryCoastal:
+            return bayEstuaryCoastalDecision(evaluation)
+        case .unsupportedUnknown:
+            return .init(confidence: .notComputable, reasons: ["Unsupported or unknown water-body class"])
+        }
+    }
+
+    private func lakeReservoirDecision(_ evaluation: CandidateEvidenceEvaluation) -> WaterBodyResolutionDecision {
+        if evaluation.contains(.selectedPointContainedByFeature)
+            && evaluation.contains(.compatibleWaterBodyClass)
+            && evaluation.contains(.productAvailable)
+            && hasFeatureIdentityLink(evaluation) {
+            return .init(
+                confidence: .accepted,
+                reasons: ["Lake/reservoir policy accepted: selected point, source identity, class, and product evidence all agree"]
+            )
+        }
         return .init(
             confidence: .needsReview,
-            reasons: ["Candidates exist, but same-water-body identity is not proven"]
+            reasons: ["Lake/reservoir evidence exists, but automatic same-feature acceptance is not proven"]
         )
+    }
+
+    private func riverStreamDecision(_ evaluation: CandidateEvidenceEvaluation) -> WaterBodyResolutionDecision {
+        if evaluation.contains(.sameAuthoritativeReach)
+            && evaluation.contains(.compatibleWaterBodyClass)
+            && evaluation.contains(.productAvailable) {
+            return .init(
+                confidence: .accepted,
+                reasons: ["River/stream policy accepted: same authoritative reach, compatible source class, and product evidence agree"]
+            )
+        }
+        if evaluation.contains(.upstreamDownstreamAmbiguous) {
+            return .init(
+                confidence: .needsReview,
+                reasons: ["River/stream topology is ambiguous; same HUC or proximity cannot prove same reach"]
+            )
+        }
+        return .init(
+            confidence: .needsReview,
+            reasons: ["River/stream evidence exists, but topology does not prove source representativeness"]
+        )
+    }
+
+    private func bayEstuaryCoastalDecision(_ evaluation: CandidateEvidenceEvaluation) -> WaterBodyResolutionDecision {
+        if evaluation.contains(.reviewedSourceRelationship)
+            && evaluation.contains(.productAvailable)
+            && evaluation.contains(.compatibleWaterBodyClass) {
+            return .init(
+                confidence: .accepted,
+                reasons: ["Coastal policy accepted only because a reviewed maintained source relationship exists"]
+            )
+        }
+        return .init(
+            confidence: .needsReview,
+            reasons: ["Coastal/bay evidence remains conservative without an authoritative basin or reviewed station relationship"]
+        )
+    }
+
+    private func hasFeatureIdentityLink(_ evaluation: CandidateEvidenceEvaluation) -> Bool {
+        evaluation.contains(.sourceContainedByFeature)
+            || evaluation.contains(.sourceExplicitlyReferencesFeature)
+            || evaluation.contains(.reviewedSourceRelationship)
+    }
+}
+
+/// Deterministic evidence policy. Distance may order otherwise-valid candidates,
+/// but proximity never establishes water-body identity.
+public struct WaterBodyResolutionEvaluator: Sendable {
+    public init() {}
+
+    public func evaluate(_ candidate: WaterBodyResolutionCandidate) -> WaterBodyResolutionDecision {
+        let evaluation = CandidateEvidenceEvaluator().evaluate(candidate)
+        return ResolutionPolicy().decide(candidate: candidate, evaluation: evaluation)
     }
 }
 

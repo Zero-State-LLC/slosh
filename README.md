@@ -23,6 +23,13 @@ Apple Watch + iPhone · watchOS 10+ · iOS 17+ · SwiftUI + SpriteKit + MapKit
 
 A watchOS app that renders live, interactive water with a fragment shader —
 refraction, caustics, sun glitter, whitecaps and spray — driven by the wrist.
+Slosh lets you wear a stylized representation of water: authored **Experiences**
+are expressive water states, while reviewed **Places** are evidence-grounded
+representations of selected real bodies of water.
+
+The canonical doctrine is in [docs/PRODUCT_DOCTRINE.md](docs/PRODUCT_DOCTRINE.md):
+Slosh is expressive and evidence-grounded, not an exact hydrodynamic simulation,
+not a navigation or safety tool, and never a nearest-sensor guess.
 
 The interesting engineering problem is that **watchOS gives third-party apps
 almost no way to draw per-pixel**. Metal is absent, SwiftUI's shader effects are
@@ -34,16 +41,28 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how it works, and
 [docs/DECISIONS.md](docs/DECISIONS.md) for why — including the design that was
 built, rejected and thrown away.
 
-## Future direction: Real Water
+## Product shape: Experiences and Places
 
-Slosh contains authored water **Experiences**. A DEBUG live-provider route and
-the normal Places selection can render San Francisco Bay on a physical Watch or
-simulator, while the reviewed Real Water catalog
-now also describes Monterey Bay and Lake Tahoe with explicit partial coverage.
-The watch picker can select those curated Places; NOAA CO-OPS and USGS NWIS
-observations stay behind provider-independent Hydro contracts. This is not
-general geographic discovery; see
-[docs/REAL_WATER.md](docs/REAL_WATER.md) for coverage and provenance rules.
+Slosh is a hybrid water experience with one coherent thesis:
+
+```text
+SLOSH
+├── EXPERIENCES  authored expressive water states
+└── PLACES       evidence-grounded representations of real waters
+```
+
+A Place lets you wear a stylized representation of the current state of a real
+body of water, but only when the observation sources are demonstrably
+representative of that selected body. Slosh does not claim exact simulation,
+scientific navigation accuracy, or arbitrary geographic coverage. Proximity
+alone is never enough to choose a source, and missing environmental signals stay
+explicitly missing rather than being synthesized.
+
+The reviewed Real Water catalog describes San Francisco Bay, Monterey Bay, and
+Lake Tahoe with explicit partial coverage. The watch picker can select those
+curated Places; NOAA CO-OPS and USGS NWIS observations stay behind
+provider-independent Hydro contracts. This is not general geographic discovery;
+see [docs/REAL_WATER.md](docs/REAL_WATER.md) for coverage and provenance rules.
 The watch picker exposes compact freshness and exact source provenance while
 keeping the full-screen water experience free of telemetry.
 
@@ -167,6 +186,7 @@ Metal's 31-buffer limit.
 
 | Document | What it covers |
 |---|---|
+| [PRODUCT_DOCTRINE.md](docs/PRODUCT_DOCTRINE.md) | Canonical representative-water doctrine |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | How the water is rendered and driven |
 | [MODES.md](docs/MODES.md) | The fifteen modes, and how to add one |
 | [DECISIONS.md](docs/DECISIONS.md) | The load-bearing calls, including the rewrite |

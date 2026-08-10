@@ -816,7 +816,9 @@ let failedB = await coordinator.refresh(
     waterBody: bayB,
     referenceDate: retrievedAt.addingTimeInterval(2 * 60)
 )
-Check.expect(failedB == .unavailable, "B failure without B cache is unavailable")
+if case let .failed(message) = failedB {
+    Check.expect(message == "Live data unavailable", "B failure without B cache reports a reason")
+} else { Check.expect(false, "B failure without B cache reports a reason") }
 let provenanceFetchedIDs = await provenanceProvider.fetchedIDs()
 Check.expect(
     provenanceFetchedIDs == [bayA.id, bayB.id],
@@ -857,7 +859,9 @@ Check.expect(
 
 let emptyCoordinator = LiveHydroCoordinator(provider: SequencedProvider([.failure]))
 let unavailable = await emptyCoordinator.refresh(waterBody: bayA, referenceDate: retrievedAt)
-Check.expect(unavailable == .unavailable, "first network failure leaves that place unavailable")
+if case let .failed(message) = unavailable {
+    Check.expect(message == "Live data unavailable", "first network failure reports a reason")
+} else { Check.expect(false, "first network failure reports a reason") }
 
 let cancellationProvider = CancellationThenSuccessProvider(
     canceledWaterBodyID: bayA.id,
@@ -900,7 +904,9 @@ Check.expect(
 private let urlCancelledProvider = URLCancelledThenSuccessProvider(state: stateA)
 let urlCancelledCoordinator = LiveHydroCoordinator(provider: urlCancelledProvider)
 let urlCancelledFirst = await urlCancelledCoordinator.refresh(waterBody: bayA, referenceDate: retrievedAt)
-Check.expect(urlCancelledFirst == .unavailable, "URLSession cancellation leaves uncached water unavailable")
+if case let .failed(message) = urlCancelledFirst {
+    Check.expect(message == "Live data unavailable", "URLSession cancellation leaves uncached water with an explicit reason")
+} else { Check.expect(false, "URLSession cancellation leaves uncached water with an explicit reason") }
 let urlCancelledRetry = await urlCancelledCoordinator.refresh(
     waterBody: bayA,
     referenceDate: retrievedAt.addingTimeInterval(1)
