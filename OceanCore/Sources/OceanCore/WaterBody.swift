@@ -42,7 +42,7 @@ public struct WaterBody: Identifiable, Sendable, Equatable {
     }
 }
 
-public enum HydroCoverageAvailability: String, Sendable, Equatable {
+public enum HydroCoverageAvailability: String, Sendable, Equatable, Codable {
     case supported
     case unavailable
 }

@@ -384,12 +384,129 @@ public enum ReviewedWaterBodyPromotionError: Error, Sendable, Equatable {
     case candidateNotAccepted
     case missingFeature
     case missingReviewedBindings
+    case candidateNotApproved
+    case incompleteCoverageDeclaration
+    case supportedCoverageMissingReviewedBinding(HydroCapability)
+}
+
+public struct ReviewedSourceBindingDeclaration: Sendable, Equatable, Codable {
+    public let namespace: String
+    public let sourceID: String
+    public let capabilities: Set<HydroCapability>
+    public let parameters: [String: String]
+
+    public init(
+        namespace: String,
+        sourceID: String,
+        capabilities: Set<HydroCapability>,
+        parameters: [String: String] = [:]
+    ) {
+        self.namespace = namespace
+        self.sourceID = sourceID
+        self.capabilities = capabilities
+        self.parameters = parameters
+    }
+
+    public var binding: HydroSourceBinding {
+        HydroSourceBinding(
+            namespace: namespace,
+            sourceID: sourceID,
+            capabilities: capabilities,
+            parameters: parameters
+        )
+    }
+}
+
+public struct HydroCapabilityCoverageDeclaration: Sendable, Equatable, Codable {
+    public let capability: HydroCapability
+    public let availability: HydroCoverageAvailability
+    public let sourceIDs: [String]
+    public let note: String
+
+    public init(
+        capability: HydroCapability,
+        availability: HydroCoverageAvailability,
+        sourceIDs: [String],
+        note: String
+    ) {
+        self.capability = capability
+        self.availability = availability
+        self.sourceIDs = sourceIDs.sorted()
+        self.note = note
+    }
+}
+
+public struct ReviewedResolutionApproval: Sendable, Equatable, Codable {
+    public let reviewerID: String
+    public let reviewedAt: Date
+    public let approved: Bool
+    public let notes: [String]
+
+    public init(
+        reviewerID: String,
+        reviewedAt: Date,
+        approved: Bool,
+        notes: [String]
+    ) {
+        self.reviewerID = reviewerID
+        self.reviewedAt = reviewedAt
+        self.approved = approved
+        self.notes = notes.sorted()
+    }
+}
+
+public struct ReviewedWaterBodyPromotionRequest: Sendable, Equatable, Codable {
+    public let candidate: WaterBodyResolutionCandidate
+    public let decision: WaterBodyResolutionDecision
+    public let approval: ReviewedResolutionApproval
+    public let id: WaterBody.ID
+    public let region: String
+    public let reviewedBindings: [ReviewedSourceBindingDeclaration]
+    public let coverage: [HydroCapabilityCoverageDeclaration]
+
+    public init(
+        candidate: WaterBodyResolutionCandidate,
+        decision: WaterBodyResolutionDecision,
+        approval: ReviewedResolutionApproval,
+        id: WaterBody.ID,
+        region: String,
+        reviewedBindings: [ReviewedSourceBindingDeclaration],
+        coverage: [HydroCapabilityCoverageDeclaration]
+    ) {
+        self.candidate = candidate
+        self.decision = decision
+        self.approval = approval
+        self.id = id
+        self.region = region
+        self.reviewedBindings = reviewedBindings.sorted {
+            if $0.namespace != $1.namespace { return $0.namespace < $1.namespace }
+            return $0.sourceID < $1.sourceID
+        }
+        self.coverage = coverage.sorted { $0.capability.rawValue < $1.capability.rawValue }
+    }
 }
 
 /// Promotion is deliberately explicit. Candidate discovery cannot manufacture a
 /// product Place without an accepted decision and separately reviewed bindings.
 public struct ReviewedWaterBodyPromotion: Sendable {
     public init() {}
+
+    public func promote(_ request: ReviewedWaterBodyPromotionRequest) throws -> WaterBody {
+        guard request.approval.approved else {
+            throw ReviewedWaterBodyPromotionError.candidateNotApproved
+        }
+        try validateCompleteCoverage(
+            request.coverage,
+            reviewedBindings: request.reviewedBindings
+        )
+        return try promote(
+            request.candidate,
+            decision: request.decision,
+            id: request.id,
+            region: request.region,
+            reviewedBindings: request.reviewedBindings.map(\.binding)
+        )
+    }
 
     public func promote(
         _ candidate: WaterBodyResolutionCandidate,
@@ -416,5 +533,27 @@ public struct ReviewedWaterBodyPromotion: Sendable {
             kind: feature.kind,
             sourceBindings: reviewedBindings
         )
+    }
+
+    private func validateCompleteCoverage(
+        _ coverage: [HydroCapabilityCoverageDeclaration],
+        reviewedBindings: [ReviewedSourceBindingDeclaration]
+    ) throws {
+        let declared = Set(coverage.map(\.capability))
+        guard declared == Set(HydroCapability.allCases), coverage.count == HydroCapability.allCases.count else {
+            throw ReviewedWaterBodyPromotionError.incompleteCoverageDeclaration
+        }
+        for declaration in coverage where declaration.availability == .supported {
+            let sourceIDs = Set(declaration.sourceIDs)
+            let backed = reviewedBindings.contains { binding in
+                sourceIDs.contains(binding.sourceID)
+                    && binding.capabilities.contains(declaration.capability)
+            }
+            guard backed else {
+                throw ReviewedWaterBodyPromotionError.supportedCoverageMissingReviewedBinding(
+                    declaration.capability
+                )
+            }
+        }
     }
 }

@@ -276,10 +276,15 @@ relevant product foundation is sound.
   corpus includes adversarial nearest-sensor cases, deterministic review artifacts,
   aggregate counts, automatic-acceptance precision, and a zero false-automatic-accept
   safety metric.
-- **Next: RW4H — Reviewed Discovery Promotion Workflow.** Take a RW4G resolution
-  artifact through human/reviewer approval, verify products, declare complete
-  coverage, create source bindings, and only then promote a canonical `WaterBody`.
-  Do not add arbitrary product map selection or automatic persistent Places.
+- **RW4H foundation complete:** the reviewed promotion workflow is now explicit in
+  `OceanCore`. A candidate promotes only after accepted resolution, reviewer
+  approval, reviewed source bindings, and complete capability coverage declaration.
+  Supported coverage must be backed by a matching reviewed binding, so promotion
+  cannot invent missing signals. No arbitrary product map selection or automatic
+  persistent Places were added.
+- **Next: RW4I — Reviewed Place Intake Tooling.** Build tooling around RW4G/RW4H
+  artifacts for human review, product verification evidence capture, and repeatable
+  reviewed Place intake without adding normal arbitrary discovery UI.
 
 ### RW5 — Historical playback
 

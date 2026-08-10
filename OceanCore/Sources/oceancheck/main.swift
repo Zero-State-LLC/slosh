@@ -833,6 +833,110 @@ Check.suite("Geographic resolution candidate prototype") {
         }
     }
 
+    Check.test("reviewed discovery promotion requires approval and complete explicit coverage") {
+        let decision = WaterBodyResolutionEvaluator().evaluate(acceptedTahoe)
+        let reviewedBinding = ReviewedSourceBindingDeclaration(
+            namespace: tahoeSource.namespace,
+            sourceID: tahoeSource.sourceID,
+            capabilities: tahoeSource.capabilities
+        )
+        let approval = ReviewedResolutionApproval(
+            reviewerID: "fixture-reviewer",
+            reviewedAt: Date(timeIntervalSince1970: 100),
+            approved: true,
+            notes: ["source identity and water-level product verified"]
+        )
+        let completeCoverage = HydroCapability.allCases.map { capability in
+            HydroCapabilityCoverageDeclaration(
+                capability: capability,
+                availability: capability == .waterLevel ? .supported : .unavailable,
+                sourceIDs: capability == .waterLevel ? [tahoeSource.sourceID] : [],
+                note: capability == .waterLevel
+                    ? "USGS gage height is reviewed as water-level coverage."
+                    : "No reviewed source supports this signal."
+            )
+        }
+        let request = ReviewedWaterBodyPromotionRequest(
+            candidate: acceptedTahoe,
+            decision: decision,
+            approval: approval,
+            id: "reviewed-tahoe-rw4h",
+            region: "California / Nevada, USA",
+            reviewedBindings: [reviewedBinding],
+            coverage: completeCoverage
+        )
+
+        let promoted = try! ReviewedWaterBodyPromotion().promote(request)
+        Check.equal(promoted.id, "reviewed-tahoe-rw4h")
+        Check.equal(promoted.coverage[.waterLevel], .supported)
+        Check.equal(promoted.coverage[.wind], .unavailable)
+
+        let unapproved = ReviewedWaterBodyPromotionRequest(
+            candidate: acceptedTahoe,
+            decision: decision,
+            approval: ReviewedResolutionApproval(
+                reviewerID: "fixture-reviewer",
+                reviewedAt: Date(timeIntervalSince1970: 101),
+                approved: false,
+                notes: ["not approved"]
+            ),
+            id: "unsafe-unapproved",
+            region: "Unknown",
+            reviewedBindings: [reviewedBinding],
+            coverage: completeCoverage
+        )
+        do {
+            _ = try ReviewedWaterBodyPromotion().promote(unapproved)
+            Check.expect(false, "unapproved candidate was promoted")
+        } catch {
+            Check.equal(error as? ReviewedWaterBodyPromotionError, .candidateNotApproved)
+        }
+
+        let incompleteCoverage = Array(completeCoverage.dropLast())
+        do {
+            _ = try ReviewedWaterBodyPromotion().promote(ReviewedWaterBodyPromotionRequest(
+                candidate: acceptedTahoe,
+                decision: decision,
+                approval: approval,
+                id: "unsafe-incomplete-coverage",
+                region: "Unknown",
+                reviewedBindings: [reviewedBinding],
+                coverage: incompleteCoverage
+            ))
+            Check.expect(false, "candidate with incomplete coverage declaration was promoted")
+        } catch {
+            Check.equal(error as? ReviewedWaterBodyPromotionError, .incompleteCoverageDeclaration)
+        }
+
+        let unsupportedWaterLevel = completeCoverage.map { declaration in
+            declaration.capability == .waterLevel
+                ? HydroCapabilityCoverageDeclaration(
+                    capability: .waterLevel,
+                    availability: .supported,
+                    sourceIDs: ["unreviewed-source"],
+                    note: "Claims water level without matching reviewed binding."
+                )
+                : declaration
+        }
+        do {
+            _ = try ReviewedWaterBodyPromotion().promote(ReviewedWaterBodyPromotionRequest(
+                candidate: acceptedTahoe,
+                decision: decision,
+                approval: approval,
+                id: "unsafe-unbacked-coverage",
+                region: "Unknown",
+                reviewedBindings: [reviewedBinding],
+                coverage: unsupportedWaterLevel
+            ))
+            Check.expect(false, "candidate with unbacked supported coverage was promoted")
+        } catch {
+            Check.equal(
+                error as? ReviewedWaterBodyPromotionError,
+                .supportedCoverageMissingReviewedBinding(.waterLevel)
+            )
+        }
+    }
+
     Check.test("resolution evidence round trips for review artifacts") {
         let data = try! JSONEncoder().encode(acceptedTahoe)
         let decoded = try! JSONDecoder().decode(WaterBodyResolutionCandidate.self, from: data)

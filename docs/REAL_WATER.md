@@ -125,6 +125,14 @@ artifacts and currently reports zero false automatic accepts. RW4G still adds no
 normal product UI, no arbitrary map selection, and no automatic WaterBody
 promotion.
 
+RW4H adds the reviewed promotion workflow boundary. A resolution candidate can
+become a `WaterBody` only when the decision is accepted, a reviewer approval is
+recorded, reviewed source bindings are supplied, and every `HydroCapability` has
+an explicit coverage declaration. Supported coverage must be backed by a reviewed
+binding for that capability; unavailable coverage remains explicit. The workflow
+turns a reviewed artifact into a promotion request, not an automatic discovery
+backend or product UI.
+
 ## Two domains
 
 - **Experiences** are the existing authored `OceanTheme` modes. They define a
