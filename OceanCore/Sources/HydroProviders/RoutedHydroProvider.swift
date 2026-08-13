@@ -1,6 +1,10 @@
 import Foundation
 import OceanCore
 
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
+
 public enum RoutedHydroProviderError: Error, Sendable, Equatable {
     case noMatchingProvider
     case noUsableMeasurements
@@ -34,26 +38,30 @@ public struct RoutedHydroProvider: HydroStateProvider, Sendable {
         let matching = routes.enumerated().filter { $0.element.matches(waterBody) }
         guard !matching.isEmpty else { throw RoutedHydroProviderError.noMatchingProvider }
 
-        let results = await withTaskGroup(
-            of: (Int, Result<HydroState, Error>).self,
-            returning: [(Int, Result<HydroState, Error>)].self
-        ) { group in
+        // Cancellation is not a provider outage. A throwing group rethrows it
+        // so a cancelled child cannot be compactMapped away and merged into
+        // last-known-good. Non-cancellation failures still return nil so one
+        // route outage cannot erase a sibling's usable measurements.
+        let results = try await withThrowingTaskGroup(of: (Int, HydroState?).self) { group in
             for (index, route) in matching {
                 group.addTask {
                     do {
-                        return (index, .success(try await route.provider.fetch(waterBody)))
+                        return (index, try await route.provider.fetch(waterBody))
+                    } catch let error as URLError where error.code == .cancelled {
+                        throw CancellationError()
+                    } catch is CancellationError {
+                        throw CancellationError()
                     } catch {
-                        return (index, .failure(error))
+                        return (index, nil)
                     }
                 }
             }
-            var values: [(Int, Result<HydroState, Error>)] = []
-            for await value in group { values.append(value) }
+            var values: [(Int, HydroState?)] = []
+            for try await value in group { values.append(value) }
             return values.sorted { $0.0 < $1.0 }
         }
 
-        if Task.isCancelled { throw CancellationError() }
-        let states = results.compactMap { try? $0.1.get() }
+        let states = results.compactMap(\.1)
         guard !states.isEmpty else { throw RoutedHydroProviderError.noUsableMeasurements }
         return try HydroStateMerger.merge(states)
     }

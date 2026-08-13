@@ -1,5 +1,6 @@
 import Foundation
 import HydroProviders
+import HydroProvidersResearch
 import OceanCore
 
 private enum Check {
@@ -226,6 +227,42 @@ private actor FixedProvider: HydroStateProvider {
     func count() -> Int { fetchCount }
 }
 
+/// One routed child fails independently of the parent task. Cancellation must
+/// not be stuffed into `Result` and merged around as a provider outage.
+private actor RouteFailureProvider: HydroStateProvider {
+    enum Failure: Sendable {
+        case cancellation
+        case urlCancelled
+        case outage
+    }
+
+    let failure: Failure
+
+    init(_ failure: Failure) { self.failure = failure }
+
+    func fetch(_ waterBody: WaterBody) async throws -> HydroState {
+        switch failure {
+        case .cancellation: throw CancellationError()
+        case .urlCancelled: throw URLError(.cancelled)
+        case .outage: throw RoutedHydroProviderError.noUsableMeasurements
+        }
+    }
+}
+
+private actor ArmableRouteProvider: HydroStateProvider {
+    let state: HydroState
+    private var shouldCancel = false
+
+    init(state: HydroState) { self.state = state }
+
+    func armCancellation() { shouldCancel = true }
+
+    func fetch(_ waterBody: WaterBody) async throws -> HydroState {
+        if shouldCancel { throw CancellationError() }
+        return state
+    }
+}
+
 /// Blocks until released, so a second caller genuinely overlaps the first.
 private actor GatedProvider: HydroStateProvider {
     private let state: HydroState
@@ -382,8 +419,10 @@ let defaultNOAASession = URLSessionNOAATransport.makeDefaultSession()
 Check.expect(defaultNOAASession.configuration.timeoutIntervalForRequest == 10, "NOAA live transport uses a watch-bounded request timeout")
 Check.expect(defaultNOAASession.configuration.timeoutIntervalForResource == 20, "NOAA live transport uses a watch-bounded resource timeout")
 Check.expect(defaultNOAASession.configuration.requestCachePolicy == .reloadIgnoringLocalCacheData, "NOAA live transport bypasses cached provider bodies")
+#if !os(Linux)
 Check.expect(defaultNOAASession.configuration.allowsExpensiveNetworkAccess == false, "NOAA live transport avoids expensive network access")
 Check.expect(defaultNOAASession.configuration.waitsForConnectivity == false, "NOAA live transport fails fast instead of waiting for connectivity")
+#endif
 
 let noaaPayloads = [
     "water_level": try fixture("valid-water-level"),
@@ -581,6 +620,68 @@ do {
     Check.expect(error == .noUsableMeasurements, "all matching provider failures remain unavailable")
 }
 
+private let childCancelledRouted = RoutedHydroProvider(routes: [
+    HydroProviderRoute(namespaces: ["test.noaa"], provider: fixedNOAA),
+    HydroProviderRoute(namespaces: ["test.usgs"], provider: RouteFailureProvider(.cancellation)),
+])
+do {
+    let leaked = try await childCancelledRouted.fetch(mixedBody)
+    Check.expect(
+        false,
+        "child CancellationError must not merge as an outage (leaked waterLevel=\(leaked.waterLevel == nil) wind=\(leaked.windSpeed != nil))"
+    )
+} catch is CancellationError {
+    Check.expect(true, "child CancellationError is cancellation, not a merged partial")
+} catch {
+    Check.expect(false, "child CancellationError is cancellation, not a merged partial: \(error)")
+}
+
+private let childURLCancelledRouted = RoutedHydroProvider(routes: [
+    HydroProviderRoute(namespaces: ["test.noaa"], provider: RouteFailureProvider(.urlCancelled)),
+    HydroProviderRoute(namespaces: ["test.usgs"], provider: fixedUSGS),
+])
+do {
+    _ = try await childURLCancelledRouted.fetch(mixedBody)
+    Check.expect(false, "child URLError.cancelled must not merge as an outage")
+} catch is CancellationError {
+    Check.expect(true, "child URLError.cancelled is cancellation, not a merged partial")
+} catch {
+    Check.expect(false, "child URLError.cancelled is cancellation, not a merged partial: \(error)")
+}
+
+do {
+    let cancelledOnly = RoutedHydroProvider(routes: [
+        HydroProviderRoute(namespaces: ["test.noaa"], provider: RouteFailureProvider(.cancellation)),
+        HydroProviderRoute(namespaces: ["test.usgs"], provider: RouteFailureProvider(.outage)),
+    ])
+    _ = try await cancelledOnly.fetch(mixedBody)
+    Check.expect(false, "child CancellationError must not collapse to noUsableMeasurements")
+} catch is CancellationError {
+    Check.expect(true, "child CancellationError wins over sibling provider outage")
+} catch {
+    Check.expect(false, "child CancellationError wins over sibling provider outage: \(error)")
+}
+
+private let gatedNOAARoute = GatedProvider(state: noaaRouteState)
+private let gatedUSGSRoute = GatedProvider(state: usgsRouteState)
+private let parentCancelledRouted = RoutedHydroProvider(routes: [
+    HydroProviderRoute(namespaces: ["test.noaa"], provider: gatedNOAARoute),
+    HydroProviderRoute(namespaces: ["test.usgs"], provider: gatedUSGSRoute),
+])
+private let parentCancelledTask = Task {
+    try await parentCancelledRouted.fetch(mixedBody)
+}
+try await Task.sleep(nanoseconds: 30_000_000)
+parentCancelledTask.cancel()
+do {
+    _ = try await parentCancelledTask.value
+    Check.expect(false, "parent cancellation must not return a merged partial")
+} catch is CancellationError {
+    Check.expect(true, "parent cancellation throws CancellationError")
+} catch {
+    Check.expect(false, "parent cancellation throws CancellationError: \(error)")
+}
+
 print("\nNOAA adapter")
 let level = try NOAAHydroAdapter.decode(
     fixture("valid-water-level"), product: .waterLevel, stationID: "9414290"
@@ -629,6 +730,10 @@ let counted = try NOAAHydroAdapter.decode(
     fixture("count-noaa-water-level"), product: .waterLevel, stationID: "9414290"
 )
 Check.expect(counted.waterLevel?.quality == .good, "water-level count flag does not trigger suspect")
+Check.expect(
+    NOAAHydroAdapter.mapQuality(flags: "12,0,0,0", assurance: "v", product: .waterLevel) == .good,
+    "water-level count 12 is not a QC boolean"
+)
 let suspectState = try NOAAHydroAggregator.state(
     samples: [suspect], retrievedAt: suspect.observedAt
 )
@@ -918,6 +1023,65 @@ if case let .updated(updatedState, _) = urlCancelledRetry {
 }
 let urlCancelledFetchCount = await urlCancelledProvider.count()
 Check.expect(urlCancelledFetchCount == 2, "URLSession cancellation does not suppress the next coordinator fetch")
+
+private let seededNOAARoute = ArmableRouteProvider(state: noaaRouteState)
+private let seededUSGSRoute = ArmableRouteProvider(state: usgsRouteState)
+private let seededRouted = RoutedHydroProvider(routes: [
+    HydroProviderRoute(namespaces: ["test.noaa"], provider: seededNOAARoute),
+    HydroProviderRoute(namespaces: ["test.usgs"], provider: seededUSGSRoute),
+])
+private let seededRoutedCoordinator = LiveHydroCoordinator(provider: seededRouted)
+let seededRoutedFirst = await seededRoutedCoordinator.refresh(
+    waterBody: mixedBody, referenceDate: retrievedAt
+)
+if case let .updated(seededState, _) = seededRoutedFirst {
+    Check.expect(
+        seededState.windSpeed != nil && seededState.waterLevel != nil,
+        "routed coordinator seeds last-known-good from both providers"
+    )
+} else {
+    Check.expect(false, "routed coordinator seeds last-known-good from both providers")
+}
+await seededUSGSRoute.armCancellation()
+let seededRoutedCancelled = await seededRoutedCoordinator.refresh(
+    waterBody: mixedBody,
+    referenceDate: retrievedAt.addingTimeInterval(12 * 60)
+)
+if case let .preserved(preservedState, _) = seededRoutedCancelled {
+    Check.expect(
+        preservedState.windSpeed != nil && preservedState.waterLevel != nil,
+        "child cancellation preserves the full last-known-good rather than caching a partial"
+    )
+} else if case let .updated(partialState, _) = seededRoutedCancelled {
+    Check.expect(
+        false,
+        "child cancellation must not cache a partial as last-known-good (waterLevel=\(partialState.waterLevel != nil) wind=\(partialState.windSpeed != nil))"
+    )
+} else {
+    Check.expect(false, "child cancellation with a warm cache preserves last-known-good")
+}
+let cachedAfterChildCancel = await seededRoutedCoordinator.cachedState(for: mixedBody)
+Check.expect(
+    cachedAfterChildCancel?.windSpeed != nil && cachedAfterChildCancel?.waterLevel != nil,
+    "last-known-good still has both routed signals after a child cancellation"
+)
+
+private let coldChildCancelCoordinator = LiveHydroCoordinator(provider: childCancelledRouted)
+let coldChildCancel = await coldChildCancelCoordinator.refresh(
+    waterBody: mixedBody, referenceDate: retrievedAt
+)
+if case .updated = coldChildCancel {
+    Check.expect(false, "cold-cache child cancellation must not store a partial as last-known-good")
+} else if case .failed = coldChildCancel {
+    Check.expect(true, "cold-cache child cancellation fails instead of updating from a partial")
+} else {
+    Check.expect(false, "cold-cache child cancellation fails instead of updating from a partial")
+}
+let cachedAfterColdChildCancel = await coldChildCancelCoordinator.cachedState(for: mixedBody)
+Check.expect(
+    cachedAfterColdChildCancel == nil,
+    "cold-cache child cancellation leaves last-known-good empty"
+)
 
 print("\nProvider metadata candidate adapters")
 let tahoeCoordinate = GeographicCoordinate(

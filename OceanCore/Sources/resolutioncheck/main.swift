@@ -1,6 +1,8 @@
 import Foundation
 import HydroProviders
+import HydroProvidersResearch
 import OceanCore
+import OceanCoreResearch
 
 private enum Check {
     static var failures = 0
