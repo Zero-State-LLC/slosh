@@ -1,4 +1,5 @@
 import Foundation
+import HydroProviders
 import OceanCore
 
 public struct ProviderMetadataCandidate: Sendable, Equatable, Codable {

@@ -1,5 +1,6 @@
 import Foundation
 import OceanCore
+import OceanCoreResearch
 
 public struct NHDPlusFeatureFixtureAdapter: Sendable {
     public init() {}

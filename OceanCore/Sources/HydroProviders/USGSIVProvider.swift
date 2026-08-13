@@ -60,8 +60,10 @@ public struct URLSessionUSGSTransport: USGSDataTransport, @unchecked Sendable {
         configuration.timeoutIntervalForRequest = 10
         configuration.timeoutIntervalForResource = 20
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        #if !os(Linux)
         configuration.allowsExpensiveNetworkAccess = false
         configuration.waitsForConnectivity = false
+        #endif
         return URLSession(configuration: configuration)
     }
 

@@ -1,4 +1,5 @@
 import Foundation
+import OceanCore
 
 public enum GeographicFeatureKind: String, Sendable, Equatable, Codable {
     case lakePond
