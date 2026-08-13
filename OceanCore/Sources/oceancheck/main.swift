@@ -937,6 +937,69 @@ Check.suite("Geographic resolution candidate prototype") {
         }
     }
 
+    Check.test("reviewed Place intake emits a deterministic artifact and fails closed on verification gaps") {
+        let decision = WaterBodyResolutionEvaluator().evaluate(acceptedTahoe)
+        let reviewedBinding = ReviewedSourceBindingDeclaration(
+            namespace: tahoeSource.namespace,
+            sourceID: tahoeSource.sourceID,
+            capabilities: tahoeSource.capabilities
+        )
+        let coverage = HydroCapability.allCases.map { capability in
+            HydroCapabilityCoverageDeclaration(
+                capability: capability,
+                availability: capability == .waterLevel ? .supported : .unavailable,
+                sourceIDs: capability == .waterLevel ? [tahoeSource.sourceID] : [],
+                note: "reviewed coverage"
+            )
+        }
+        let promotion = ReviewedWaterBodyPromotionRequest(
+            candidate: acceptedTahoe,
+            decision: decision,
+            approval: ReviewedResolutionApproval(
+                reviewerID: "rw4i-reviewer",
+                reviewedAt: Date(timeIntervalSince1970: 200),
+                approved: true,
+                notes: ["verified"]
+            ),
+            id: "rw4i-tahoe",
+            region: "California / Nevada, USA",
+            reviewedBindings: [reviewedBinding],
+            coverage: coverage
+        )
+        let evidence = ProductVerificationEvidenceKind.allCases.reversed().map {
+            ProductVerificationEvidence(kind: $0, verified: true, source: "fixture", note: $0.rawValue)
+        }
+        let artifact = try! ReviewedPlaceIntake().build(
+            ReviewedPlaceIntakeRequest(promotion: promotion, verificationEvidence: evidence)
+        )
+        Check.equal(artifact.place.id, "rw4i-tahoe")
+        Check.equal(artifact.reviewerID, "rw4i-reviewer")
+        Check.equal(artifact.verificationEvidence.map(\.kind), ProductVerificationEvidenceKind.allCases.sorted { $0.rawValue < $1.rawValue })
+
+        do {
+            _ = try ReviewedPlaceIntake().build(
+                ReviewedPlaceIntakeRequest(promotion: promotion, verificationEvidence: Array(evidence.dropLast()))
+            )
+            Check.expect(false, "incomplete product evidence was accepted")
+        } catch {
+            Check.equal(error as? ReviewedPlaceIntakeError, .incompleteVerificationEvidence)
+        }
+
+        let failedEvidence = evidence.map { item in
+            item.kind == .productPresentation
+                ? ProductVerificationEvidence(kind: item.kind, verified: false, source: item.source, note: item.note)
+                : item
+        }
+        do {
+            _ = try ReviewedPlaceIntake().build(
+                ReviewedPlaceIntakeRequest(promotion: promotion, verificationEvidence: failedEvidence)
+            )
+            Check.expect(false, "failed product evidence was accepted")
+        } catch {
+            Check.equal(error as? ReviewedPlaceIntakeError, .failedVerification(.productPresentation))
+        }
+    }
+
     Check.test("resolution evidence round trips for review artifacts") {
         let data = try! JSONEncoder().encode(acceptedTahoe)
         let decoded = try! JSONDecoder().decode(WaterBodyResolutionCandidate.self, from: data)

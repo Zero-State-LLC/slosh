@@ -26,9 +26,10 @@ if ! swift build >/dev/null 2>&1; then
   fail "swift build"
 else
   pass "swift build"
-  # Discovered rather than hardcoded, so a new suite is covered the day it lands.
+  # Check executables follow the *check naming convention. Operational CLIs may
+  # require arguments and are exercised by their owning suite instead.
   for suite in $(swift package describe --type json 2>/dev/null \
-      | python3 -c "import json,sys;print(' '.join(t['name'] for t in json.load(sys.stdin)['targets'] if t['type']=='executable'))"); do
+      | python3 -c "import json,sys;print(' '.join(t['name'] for t in json.load(sys.stdin)['targets'] if t['type']=='executable' and t['name'].endswith('check')))"); do
     out=$(swift run "$suite" 2>&1)
     if [ $? -eq 0 ] && ! grep -qiE "✗|failed" <<<"$out"; then
       pass "$suite — $(tail -1 <<<"$out" | sed 's/^ *//')"

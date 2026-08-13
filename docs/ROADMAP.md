@@ -282,9 +282,16 @@ relevant product foundation is sound.
   Supported coverage must be backed by a matching reviewed binding, so promotion
   cannot invent missing signals. No arbitrary product map selection or automatic
   persistent Places were added.
-- **Next: RW4I — Reviewed Place Intake Tooling.** Build tooling around RW4G/RW4H
-  artifacts for human review, product verification evidence capture, and repeatable
-  reviewed Place intake without adding normal arbitrary discovery UI.
+- **RW4I complete:** `placeintake` turns a reviewed RW4H promotion request plus
+  explicit feature, binding, coverage, and product-presentation verification
+  evidence into a deterministic JSON intake artifact. Missing or failed evidence,
+  incomplete coverage, unreviewed bindings, unapproved review, and non-accepted
+  resolution all fail closed. `--example` emits a repeatable request template.
+  The tool does not mutate `WaterBodies.all`, add product UI, or automatically
+  persist discovered Places.
+- **Next:** use RW4I for the next genuinely reviewed Place only when real evidence
+  exists. Phase 0 physical-watch validation and the product-scope decision remain
+  the higher-priority gates; do not manufacture catalog growth to exercise tooling.
 
 ### RW5 — Historical playback
 

@@ -36,5 +36,6 @@ let package = Package(
             dependencies: ["OceanCore", "HydroProviders"],
             resources: [.process("Fixtures"), .copy("Artifacts")]
         ),
+        .executableTarget(name: "placeintake", dependencies: ["OceanCore"]),
     ]
 )

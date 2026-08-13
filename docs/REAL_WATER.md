@@ -133,6 +133,22 @@ binding for that capability; unavailable coverage remains explicit. The workflow
 turns a reviewed artifact into a promotion request, not an automatic discovery
 backend or product UI.
 
+RW4I makes that review boundary repeatable. From `OceanCore`, run:
+
+```bash
+swift run placeintake --example --output intake-request.json
+swift run placeintake --input intake-request.json --output intake-artifact.json
+```
+
+The request records the RW4H promotion input plus four required verification
+classes: authoritative feature identity, source binding, capability coverage, and
+product presentation. Every class must be present and verified. The command then
+re-runs the promotion gate and emits stable, sorted JSON containing the approved
+Place, reviewed bindings, explicit coverage, reviewer identity, review time, and
+decision reasons. The example contains visible replacement markers and is a
+template, not evidence. `placeintake` never edits `WaterBodies.all`, writes product
+state, or exposes arbitrary map discovery.
+
 ## Two domains
 
 - **Experiences** are the existing authored `OceanTheme` modes. They define a
