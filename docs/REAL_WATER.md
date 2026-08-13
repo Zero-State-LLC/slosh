@@ -303,12 +303,16 @@ report where water flows **toward**. The adapter records those conventions on th
 source measurements; `HydroInterpreter` still performs the one canonical
 conversion into direction-toward radians.
 
-Quality mapping is fail-closed and preserves provenance:
+Quality mapping is fail-closed and preserves provenance. For `water_level`,
+CO-OPS `f` is `O,F,R,L` where **O is an outlier count**, not a boolean; only
+F/R/L are treated as QC flags. Wind `(X,R)` and air pressure / water
+temperature `(X,N,R)` remain all-boolean:
 
 ```text
-any documented nonzero NOAA data flag → suspect
-all documented flags zero            → good
-missing flags or undocumented QA      → unknown
+water_level F/R/L boolean nonzero   → suspect
+water_level outlier count (first field) ignored
+all documented boolean flags zero   → good
+missing flags or undocumented QA    → unknown
 ```
 
 Preliminary (`p`) and verified (`v`) water levels are both usable when their
