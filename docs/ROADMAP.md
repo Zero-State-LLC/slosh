@@ -186,7 +186,7 @@ relevant product foundation is sound.
   one Calm ocean base without adding shader uniforms.
 - **RW2B live debug vertical slice complete:** the curated San Francisco Bay
   entry combines NOAA CO-OPS water level, wind, and air pressure from `9414290`
-  with observed currents from `s09010` bin 2. Provider networking and DTOs stay
+  with observed currents from `s10010` bin 2. Provider networking and DTOs stay
   in `HydroProviders`; partial data and network failure preserve authored water.
 - **RW2C provenance and freshness hardening complete:** refresh throttles,
   last-valid states, and failure fallbacks are isolated by canonical

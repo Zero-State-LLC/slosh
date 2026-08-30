@@ -59,7 +59,7 @@ RW4B presents the same reviewed catalog through a MapKit map and the existing
 list. Every annotation is derived from a canonical `WaterBody.id`, latitude, and
 longitude. A pin represents San Francisco Bay, Monterey Bay, or Lake Tahoe as a
 product Place. It never represents NOAA station `9414290`, current station
-`s09010`, USGS site `10337000`, or any other sensor.
+`s10010`, USGS site `10337000`, or any other sensor.
 
 The map consumes the same keyed observation store and provider-independent Place
 status used by the list. It remains complete offline and shows loading,
@@ -359,7 +359,7 @@ bindings:
 | Binding | Why it exists | Products used |
 |---|---|---|
 | San Francisco `9414290` | Active water-level and meteorological station near the Golden Gate | `water_level`, `wind`, `air_pressure` |
-| Oakland Outer Harbor LB3 `s09010`, bin `2` | Active San Francisco Bay PORTS current station; NOAA identifies bin 2 as its real-time bin | `currents` |
+| Oakland Inner Harbor LB4 `s10010`, bin `2` | Active San Francisco Bay PORTS current station; NOAA identifies bin 2 as its real-time bin. Replaced Oakland Outer Harbor LB3 `s09010`, which stopped answering `date=latest` for roughly 45% of wall clock | `currents` |
 
 Coverage is intentionally not uniform:
 
@@ -368,7 +368,7 @@ Coverage is intentionally not uniform:
 | Water level | Available from `9414290` |
 | Wind speed and direction | Available from `9414290` |
 | Air pressure | Available from `9414290` |
-| Current speed and direction | Available from separate station `s09010`, bin 2 |
+| Current speed and direction | Available from separate station `s10010`, bin 2 |
 | Water temperature | Unavailable: the `9414290` sensor is inactive and NOAA reports no current data |
 | Salinity | Unavailable at the selected station |
 | Wave height and period | Unsupported in this slice; remain `nil` |
@@ -384,12 +384,16 @@ report where water flows **toward**. The adapter records those conventions on th
 source measurements; `HydroInterpreter` still performs the one canonical
 conversion into direction-toward radians.
 
-Quality mapping is fail-closed and preserves provenance:
+Quality mapping is fail-closed and preserves provenance. For `water_level`,
+CO-OPS `f` is `O,F,R,L` where **O is an outlier count**, not a boolean; only
+F/R/L are treated as QC flags. Wind `(X,R)` and air pressure / water
+temperature `(X,N,R)` remain all-boolean:
 
 ```text
-any documented nonzero NOAA data flag → suspect
-all documented flags zero            → good
-missing flags or undocumented QA      → unknown
+water_level F/R/L boolean nonzero   → suspect
+water_level outlier count (first field) ignored
+all documented boolean flags zero   → good
+missing flags or undocumented QA    → unknown
 ```
 
 Preliminary (`p`) and verified (`v`) water levels are both usable when their
@@ -425,7 +429,7 @@ RW3 keeps the catalog deliberately small and reviewed:
 
 | Place | Provider source | Reviewed observed coverage |
 |---|---|---|
-| San Francisco Bay | NOAA CO-OPS `9414290`; currents `s09010` bin 2 | water level, wind, pressure, current speed and direction |
+| San Francisco Bay | NOAA CO-OPS `9414290`; currents `s10010` bin 2 | water level, wind, pressure, current speed and direction |
 | Monterey Bay | NOAA CO-OPS `9413450` | water level, water temperature, pressure |
 | Lake Tahoe | USGS NWIS instantaneous values `10337000` | gage height as water level |
 

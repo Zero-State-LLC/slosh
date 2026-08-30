@@ -31,11 +31,18 @@ else
   for suite in $(swift package describe --type json 2>/dev/null \
       | python3 -c "import json,sys;print(' '.join(t['name'] for t in json.load(sys.stdin)['targets'] if t['type']=='executable' and t['name'].endswith('check')))"); do
     out=$(swift run "$suite" 2>&1)
-    if [ $? -eq 0 ] && ! grep -qiE "✗|failed" <<<"$out"; then
+    status=$?
+    # Trust the exit code. Every suite exits non-zero on failure, and scanning
+    # all output for "failed" gave false negatives: a passing providercheck
+    # prints "NOAA product currents ... failed" from its own default reporter
+    # while deliberately exercising the failure path. A verify script that
+    # calls a green tree broken is worse than none, because people stop reading
+    # it.
+    if [ $status -eq 0 ]; then
       pass "$suite — $(tail -1 <<<"$out" | sed 's/^ *//')"
     else
       fail "$suite"
-      grep -E "✗|Fatal error|failed" <<<"$out" | head -5 | sed 's/^/      /'
+      grep -E "✗|Fatal error" <<<"$out" | head -5 | sed 's/^/      /'
     fi
   done
 fi

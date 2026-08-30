@@ -98,11 +98,17 @@ public enum NOAAHydroAdapter {
         return sample
     }
 
-    /// CO-OPS QC flags vary by product and include leading count in water-level.
+    /// CO-OPS QC flags vary by product, and water_level carries a leading
+    /// sample *count* rather than a boolean. The per-product policy lives in
+    /// `qualityFlagPolicy` below.
+    ///
+    /// `product` is deliberately not defaulted: defaulting it to `.waterLevel`
+    /// means a caller who forgets the argument silently gets water-level
+    /// semantics applied to wind, which drops a real QC failure on the floor.
     public static func mapQuality(
         flags: String?,
         assurance: String?,
-        product: NOAAProduct = .waterLevel
+        product: NOAAProduct
     ) -> HydroQuality {
         guard let flags, !flags.isEmpty else { return .unknown }
         let values = Array(flags.split(separator: ",", omittingEmptySubsequences: false))

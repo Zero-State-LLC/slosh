@@ -447,6 +447,123 @@ let concurrentNOAAState = try await concurrentNOAAProvider.fetch(bay)
 Check.expect(concurrentNOAAState.waterLevel != nil && concurrentNOAAState.windSpeed != nil, "concurrent NOAA fetch still aggregates usable products")
 let maxNOAAConcurrency = await concurrentNOAATransport.maximumActiveRequests()
 Check.expect(maxNOAAConcurrency > 1, "NOAA provider fetches products concurrently")
+
+private final class ProductFailureLog: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [(product: NOAAProduct, stationID: String, error: String)] = []
+
+    func report(product: NOAAProduct, stationID: String, error: Error) {
+        lock.lock()
+        storage.append((product, stationID, String(describing: error)))
+        lock.unlock()
+    }
+
+    var recorded: [(product: NOAAProduct, stationID: String, error: String)] {
+        lock.lock()
+        defer { lock.unlock() }
+        return storage
+    }
+}
+
+private struct MapNOAATransport: NOAADataTransport {
+    let payloads: [String: Data]
+    func data(from url: URL) async throws -> Data {
+        let product = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?
+            .first(where: { $0.name == "product" })?
+            .value ?? ""
+        guard let payload = payloads[product] else { throw NOAAProviderError.noUsableMeasurements }
+        return payload
+    }
+}
+
+print("\nTyped NOAA product failures")
+private let currentsFailureLog = ProductFailureLog()
+private let mixedPayloads = [
+    "water_level": try fixture("valid-water-level"),
+    "wind": try fixture("valid-wind"),
+    "air_pressure": try fixture("valid-pressure"),
+    "currents": try fixture("provider-error"),
+]
+private let mixedFailureProvider = NOAACOOPSProvider(
+    transport: MapNOAATransport(payloads: mixedPayloads),
+    reportProductFailure: { product, stationID, error in
+        currentsFailureLog.report(product: product, stationID: stationID, error: error)
+    }
+)
+let mixedFailureState = try await mixedFailureProvider.fetch(bay)
+Check.expect(
+    mixedFailureState.waterLevel != nil && mixedFailureState.windSpeed != nil,
+    "typed currents failure preserves other usable NOAA products"
+)
+Check.expect(
+    mixedFailureState.currentSpeed == nil && mixedFailureState.currentDirection == nil,
+    "typed currents failure does not invent current measurements"
+)
+let mixedFailures = currentsFailureLog.recorded
+Check.expect(
+    mixedFailures.contains {
+        $0.product == .currents && $0.stationID == "s10010" && $0.error.contains("No data was found")
+    },
+    "typed currents providerMessage is reported instead of swallowed"
+)
+Check.expect(
+    mixedFailures.allSatisfy { $0.product == .currents },
+    "successful sibling products are not reported as failures"
+)
+
+let currentsOnly = WaterBody(
+    id: "currents-only",
+    name: "Currents Only",
+    region: "Test",
+    latitude: 0,
+    longitude: 0,
+    kind: .bay,
+    sourceBindings: [
+        HydroSourceBinding(
+            namespace: NOAACOOPSProvider<URLSessionNOAATransport>.currentStationNamespace,
+            sourceID: "s09010",
+            capabilities: [.currentSpeed, .currentDirection],
+            parameters: ["bin": "2"]
+        )
+    ]
+)
+do {
+    _ = try await NOAACOOPSProvider(
+        transport: MapNOAATransport(payloads: ["currents": try fixture("provider-error")]),
+        reportProductFailure: { _, _, _ in }
+    ).fetch(currentsOnly)
+    Check.expect(false, "currents-only providerMessage surfaces as a typed error")
+} catch let error as NOAAProviderError {
+    if case let .providerMessage(message) = error {
+        Check.expect(
+            message.contains("No data was found"),
+            "currents-only providerMessage surfaces as a typed error"
+        )
+    } else {
+        Check.expect(false, "currents-only providerMessage surfaces as a typed error: \(error)")
+    }
+} catch {
+    Check.expect(false, "currents-only providerMessage surfaces as a typed error: \(error)")
+}
+
+private let ordinaryAbsenceLog = ProductFailureLog()
+do {
+    _ = try await NOAACOOPSProvider(
+        transport: MapNOAATransport(payloads: [:]),
+        reportProductFailure: { product, stationID, error in
+            ordinaryAbsenceLog.report(product: product, stationID: stationID, error: error)
+        }
+    ).fetch(currentsOnly)
+    Check.expect(false, "ordinary empty currents payload remains no usable measurements")
+} catch let error as NOAAProviderError {
+    Check.expect(
+        error == .noUsableMeasurements && ordinaryAbsenceLog.recorded.isEmpty,
+        "ordinary empty currents payload remains silent absence rather than a typed failure"
+    )
+} catch {
+    Check.expect(false, "ordinary empty currents payload remains no usable measurements: \(error)")
+}
 private let usgsProvider = USGSIVProvider(transport: FixtureUSGSTransport(payload: try fixture("valid-usgs-lake-level")))
 let tahoeRequests = usgsProvider.requests(for: WaterBodies.lakeTahoe)
 Check.expect(tahoeRequests.count == 1 && tahoeRequests[0].siteID == "10337000", "Lake Tahoe resolves to reviewed USGS site")
@@ -689,6 +806,54 @@ let level = try NOAAHydroAdapter.decode(
 Check.equal(level.waterLevel?.value, 1.234, "water level decodes in meters")
 Check.expect(level.waterLevel?.unit == .meters, "water level carries an explicit unit")
 Check.expect(level.waterLevel?.quality == .good, "verified zero-flag water level maps to good")
+Check.expect(
+    NOAAHydroAdapter.mapQuality(flags: nil, assurance: nil, product: .waterLevel) == .unknown,
+    "missing water-level QC flags remain unknown"
+)
+Check.expect(
+    NOAAHydroAdapter.mapQuality(flags: "", assurance: "v", product: .waterLevel) == .unknown,
+    "empty water-level QC flags remain unknown"
+)
+Check.expect(
+    NOAAHydroAdapter.mapQuality(flags: "0,0,0,0", assurance: "v", product: .waterLevel) == .good,
+    "all-zero water-level flags map to good"
+)
+Check.expect(
+    NOAAHydroAdapter.mapQuality(flags: "1,0,0,0", assurance: "v", product: .waterLevel) == .good,
+    "water-level outlier count of 1 is not a boolean QC failure"
+)
+Check.expect(
+    NOAAHydroAdapter.mapQuality(flags: "12,0,0,0", assurance: "p", product: .waterLevel) == .good,
+    "larger water-level outlier counts remain usable when F/R/L are clear"
+)
+Check.expect(
+    NOAAHydroAdapter.mapQuality(flags: "0,1,0,0", assurance: "p", product: .waterLevel) == .suspect,
+    "water-level flat-tolerance failure remains suspect"
+)
+Check.expect(
+    NOAAHydroAdapter.mapQuality(flags: "0,0,1,0", assurance: "p", product: .waterLevel) == .suspect,
+    "water-level rate-of-change failure remains suspect"
+)
+Check.expect(
+    NOAAHydroAdapter.mapQuality(flags: "0,0,0,1", assurance: "p", product: .waterLevel) == .suspect,
+    "water-level expected-range failure remains suspect"
+)
+Check.expect(
+    NOAAHydroAdapter.mapQuality(flags: "0,0", assurance: nil, product: .wind) == .good,
+    "boolean wind flags of 0,0 map to good"
+)
+Check.expect(
+    NOAAHydroAdapter.mapQuality(flags: "1,0", assurance: nil, product: .wind) == .suspect,
+    "boolean wind X flag of 1 maps to suspect"
+)
+Check.expect(
+    NOAAHydroAdapter.mapQuality(flags: "0,0,0", assurance: nil, product: .airPressure) == .good,
+    "boolean air-pressure flags of 0,0,0 map to good"
+)
+Check.expect(
+    NOAAHydroAdapter.mapQuality(flags: "1,0,0", assurance: nil, product: .airPressure) == .suspect,
+    "boolean air-pressure X flag of 1 maps to suspect"
+)
 Check.expect(level.waterLevel?.origin == .observed, "NOAA observations retain observed provenance")
 Check.expect(level.waterLevel?.observedAt == level.observedAt, "measurement retains its own observation timestamp")
 
@@ -743,6 +908,24 @@ Check.expect(
         referenceDate: suspect.observedAt
     ).forcing.freshness == .unavailable,
     "suspect-only state cannot create usable forcing"
+)
+
+let outlierCount = try NOAAHydroAdapter.decode(
+    fixture("outlier-count-water-level"), product: .waterLevel, stationID: "9414290"
+)
+Check.expect(
+    outlierCount.waterLevel?.quality == .good,
+    "live-shaped water-level f=1,0,0,0 remains good"
+)
+let outlierState = try NOAAHydroAggregator.state(
+    samples: [outlierCount], retrievedAt: outlierCount.observedAt
+)
+Check.expect(
+    HydroInterpreter().interpret(
+        outlierState,
+        referenceDate: outlierCount.observedAt
+    ).forcing.freshness != .unavailable,
+    "outlier-count-only water level remains usable for forcing"
 )
 
 var providerErrorWasTyped = false

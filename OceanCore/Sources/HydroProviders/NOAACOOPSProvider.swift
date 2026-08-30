@@ -57,6 +57,7 @@ public struct URLSessionNOAATransport: NOAADataTransport, @unchecked Sendable {
         configuration.timeoutIntervalForRequest = 10
         configuration.timeoutIntervalForResource = 20
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        // FoundationNetworking on Linux does not expose these Apple-only flags.
         #if !os(Linux)
         configuration.allowsExpensiveNetworkAccess = false
         configuration.waitsForConnectivity = false
@@ -81,72 +82,82 @@ public struct NOAACOOPSProvider<Transport: NOAADataTransport>: HydroStateProvide
     public static var currentStationNamespace: String { "gov.noaa.coops.current-station" }
 
     public let transport: Transport
+    public let reportProductFailure: @Sendable (NOAAProduct, String, Error) -> Void
 
-    public init(transport: Transport) {
+    public init(
+        transport: Transport,
+        reportProductFailure: @escaping @Sendable (NOAAProduct, String, Error) -> Void = {
+            product, stationID, error in
+            let line = "NOAA product \(product.rawValue) station \(stationID) failed: \(error)\n"
+            FileHandle.standardError.write(Data(line.utf8))
+        }
+    ) {
         self.transport = transport
+        self.reportProductFailure = reportProductFailure
     }
 
     public func fetch(_ waterBody: WaterBody) async throws -> HydroState {
         let requests = requests(for: waterBody)
-        let (samples, failures) = await withTaskGroup(
-            of: Result<NOAAProductSample?, Error>.self,
-            returning: ([NOAAProductSample], [Error]).self
-        ) { group in
+        let outcome = try await withThrowingTaskGroup(of: NOAAProductTaskResult.self) { group in
             for request in requests {
+                try Task.checkCancellation()
                 group.addTask { [transport] in
-                    if Task.isCancelled { return .failure(CancellationError()) }
+                    try Task.checkCancellation()
                     do {
                         guard let url = request.url else { throw NOAAProviderError.invalidRequest }
                         let data = try await transport.data(from: url)
                         let sample = try NOAAHydroAdapter.decode(
                             data, product: request.product, stationID: request.stationID
                         )
-                        return .success(sample.hasMeasurement ? sample : nil)
+                        return .sample(sample.hasMeasurement ? sample : nil)
                     } catch let error as URLError where error.code == .cancelled {
-                        return .failure(CancellationError())
+                        throw CancellationError()
                     } catch is CancellationError {
-                        return .failure(CancellationError())
+                        throw CancellationError()
+                    } catch let error as NOAAProviderError where error == .noUsableMeasurements {
+                        // Empty payloads are ordinary absence, not a typed provider failure.
+                        return .sample(nil)
+                    } catch let error as NOAAProviderError {
+                        return .failed(
+                            NOAAProductFailure(
+                                product: request.product,
+                                stationID: request.stationID,
+                                providerError: error
+                            )
+                        )
                     } catch {
-                        // Partial product coverage is normal. Individual failures stay
-                        // absent; only an entirely empty aggregate fails below.
-                        return .failure(error)
+                        return .failed(
+                            NOAAProductFailure(
+                                product: request.product,
+                                stationID: request.stationID,
+                                message: String(describing: error)
+                            )
+                        )
                     }
                 }
             }
 
             var samples: [NOAAProductSample] = []
-            var failures: [Error] = []
-            for await result in group {
+            var failures: [NOAAProductFailure] = []
+            for try await result in group {
                 switch result {
-                case let .success(sample):
+                case let .sample(sample):
                     if let sample { samples.append(sample) }
-                case let .failure(error):
-                    failures.append(error)
+                case let .failed(failure):
+                    failures.append(failure)
                 }
             }
             return (samples, failures)
         }
 
-        if failures.contains(where: Self.isCancellationFailure) {
-            throw CancellationError()
+        let (samples, failures) = outcome
+        for failure in failures {
+            reportProductFailure(failure.product, failure.stationID, failure.error)
         }
-        if samples.isEmpty {
-            if let terminalFailure = failures.first(where: Self.isTerminalFailure) {
-                throw terminalFailure
-            }
-            throw NOAAProviderError.noUsableMeasurements
+        if samples.isEmpty, let firstFailure = failures.first {
+            throw firstFailure.error
         }
         return try NOAAHydroAggregator.state(samples: samples, retrievedAt: Date())
-    }
-
-    private static func isTerminalFailure(_ error: Error) -> Bool {
-        guard let providerError = error as? NOAAProviderError else { return false }
-        if case .providerMessage = providerError { return true }
-        return false
-    }
-
-    private static func isCancellationFailure(_ error: Error) -> Bool {
-        error is CancellationError
     }
 
     public func requests(for waterBody: WaterBody) -> [NOAARequest] {
@@ -189,5 +200,48 @@ public typealias LiveNOAACOOPSProvider = NOAACOOPSProvider<URLSessionNOAATranspo
 public extension NOAACOOPSProvider where Transport == URLSessionNOAATransport {
     init() {
         self.init(transport: URLSessionNOAATransport())
+    }
+}
+
+/// Typed NOAA product failures that must not be mistaken for ordinary missing coverage.
+private enum NOAAProductTaskResult: Sendable {
+    case sample(NOAAProductSample?)
+    case failed(NOAAProductFailure)
+}
+
+private struct NOAAProductFailure: Sendable {
+    let product: NOAAProduct
+    let stationID: String
+    let providerError: NOAAProviderError?
+    let message: String
+
+    init(product: NOAAProduct, stationID: String, providerError: NOAAProviderError) {
+        self.product = product
+        self.stationID = stationID
+        self.providerError = providerError
+        self.message = providerError.description
+    }
+
+    init(product: NOAAProduct, stationID: String, message: String) {
+        self.product = product
+        self.stationID = stationID
+        self.providerError = nil
+        self.message = message
+    }
+
+    var error: Error {
+        providerError ?? NOAAReportedProductError(
+            product: product, stationID: stationID, message: message
+        )
+    }
+}
+
+private struct NOAAReportedProductError: Error, Sendable, CustomStringConvertible {
+    let product: NOAAProduct
+    let stationID: String
+    let message: String
+
+    var description: String {
+        "NOAA product \(product.rawValue) station \(stationID) failed: \(message)"
     }
 }
