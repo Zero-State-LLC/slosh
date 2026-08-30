@@ -1,12 +1,16 @@
 name: Verify
 
-# The Swift suites and the four app targets have never run in CI. CodeQL was
-# the only workflow, and it was analysing JavaScript and Python in a repository
+# The Swift suites and the app targets have never run in CI. CodeQL was the
+# only workflow, and it was analysing JavaScript and Python in a repository
 # that contains neither.
 #
 # This runs on the self-hosted macOS runner rather than a GitHub-hosted one for
 # two reasons: watchOS and iOS builds need Xcode, and GitHub-hosted macOS bills
 # at ten times the Linux rate. Self-hosted is free and already has the SDKs.
+#
+# The steps are spelled out here rather than delegating to scripts/verify.sh,
+# because that script is still unmerged in #29. Once it lands, these steps can
+# collapse into a single call to it.
 on:
   push:
     branches: [main]
@@ -32,13 +36,53 @@ jobs:
 
       - name: Toolchain
         run: |
-          echo "Xcode: $(xcodebuild -version | head -1)"
-          echo "Swift: $(swift --version 2>&1 | head -1)"
+          echo "Xcode:  $(xcodebuild -version | head -1)"
+          echo "Swift:  $(swift --version 2>&1 | head -1)"
 
       # Suites first: they are fast and catch most regressions, so a broken
-      # commit fails in a minute rather than after the app builds.
+      # commit fails in about a minute rather than after a full Xcode build.
+      # Discovered from the package manifest so a new suite is picked up
+      # without editing this file.
       - name: Swift suites
-        run: ./scripts/verify.sh --suites
+        working-directory: OceanCore
+        run: |
+          set -uo pipefail
+          swift build
+          suites=$(swift package describe --type json \
+            | python3 -c "import json,sys; print(' '.join(t['name'] for t in json.load(sys.stdin)['targets'] if t['type']=='executable' and t['name'].endswith('check')))")
+          echo "suites: $suites"
+          status=0
+          for suite in $suites; do
+            echo "::group::$suite"
+            # Trust the exit code. Suites print expected failure text while
+            # exercising their own error paths, so grepping output for
+            # "failed" reports a green tree as broken.
+            if swift run "$suite"; then
+              echo "::endgroup::"
+            else
+              status=1
+              echo "::endgroup::"
+              echo "::error::$suite failed"
+            fi
+          done
+          exit $status
 
       - name: App targets
-        run: ./scripts/verify.sh
+        run: |
+          set -uo pipefail
+          WATCH_SIM=$(xcrun simctl list devices available --json \
+            | python3 -c "import json,sys;d=json.load(sys.stdin)['devices'];print(next(dev['udid'] for rt,l in d.items() if 'watchOS' in rt for dev in l))")
+          echo "watch simulator: $WATCH_SIM"
+          status=0
+          build() {
+            echo "::group::$1"
+            shift
+            xcodebuild "$@" CODE_SIGNING_ALLOWED=NO -quiet || status=1
+            echo "::endgroup::"
+          }
+          cd Slosh
+          build "Watch Debug (simulator)" -scheme "Slosh Watch App" \
+            -destination "id=$WATCH_SIM" -configuration Debug build
+          build "Watch Release (device)" -scheme "Slosh Watch App" \
+            -destination "generic/platform=watchOS" -configuration Release build
+          exit $status
