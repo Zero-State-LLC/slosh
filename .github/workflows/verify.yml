@@ -1,0 +1,44 @@
+name: Verify
+
+# The Swift suites and the four app targets have never run in CI. CodeQL was
+# the only workflow, and it was analysing JavaScript and Python in a repository
+# that contains neither.
+#
+# This runs on the self-hosted macOS runner rather than a GitHub-hosted one for
+# two reasons: watchOS and iOS builds need Xcode, and GitHub-hosted macOS bills
+# at ten times the Linux rate. Self-hosted is free and already has the SDKs.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A superseded push should not keep a laptop busy building a commit nobody is
+# waiting for any more.
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: [self-hosted, macOS, slosh]
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          echo "Xcode: $(xcodebuild -version | head -1)"
+          echo "Swift: $(swift --version 2>&1 | head -1)"
+
+      # Suites first: they are fast and catch most regressions, so a broken
+      # commit fails in a minute rather than after the app builds.
+      - name: Swift suites
+        run: ./scripts/verify.sh --suites
+
+      - name: App targets
+        run: ./scripts/verify.sh
