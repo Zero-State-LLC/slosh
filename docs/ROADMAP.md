@@ -157,6 +157,11 @@ Only worth doing if Phase 4 shows any traction.
 
 ## Future track — Real Water
 
+The canonical representative-water doctrine is now in
+[PRODUCT_DOCTRINE.md](PRODUCT_DOCTRINE.md). Future Real Water work must preserve
+truthful inputs, explicit uncertainty, no nearest-sensor guessing, no fabricated
+missing data, and no exact-simulation claims.
+
 This track does not weaken **Phase 0**. Physical-watch validation remains the
 blocking platform-risk gate, and no network-backed product work should be used
 to defer it. The phases below are planned, not shipped, and begin only after the
@@ -181,7 +186,7 @@ relevant product foundation is sound.
   one Calm ocean base without adding shader uniforms.
 - **RW2B live debug vertical slice complete:** the curated San Francisco Bay
   entry combines NOAA CO-OPS water level, wind, and air pressure from `9414290`
-  with observed currents from `s09010` bin 2. Provider networking and DTOs stay
+  with observed currents from `s10010` bin 2. Provider networking and DTOs stay
   in `HydroProviders`; partial data and network failure preserve authored water.
 - **RW2C provenance and freshness hardening complete:** refresh throttles,
   last-valid states, and failure fallbacks are isolated by canonical
@@ -252,11 +257,41 @@ relevant product foundation is sound.
   evidence. Proximity, site class, and HUC remain evidence rather than identity;
   product capabilities are never inferred from location metadata. The adapters
   create no `WaterBody`, add no catalog entry, and have no product UI wiring.
-- **Next: RW4F — Authoritative Geographic Feature Resolver Prototype.** Evaluate
-  one bounded, reproducible feature-query/index approach for inland water-body
-  identity and containment. Compose its feature evidence with RW4E candidates in
-  research tooling only; preserve `needsReview` and `notComputable`, and do not
-  expose arbitrary map selection yet.
+- **RW4F complete:** a provider-independent authoritative geographic feature
+  resolver prototype now uses a captured, generalized polygon and stable identity
+  from the official USGS The National Map NHDPlus High Resolution `NHDWaterbody`
+  service for the primary Lake Tahoe containment case. NHD-specific DTOs remain
+  outside `OceanCore`. Separately labeled synthetic NHDPlus-schema scenarios cover
+  river-policy and conservative coastal decisions without claiming authoritative
+  feature extraction. Accepted inland
+  identity, explicit nearby Truckee River mismatch rejection, bounded river/flowline
+  `needsReview`, conservative San Francisco Bay `needsReview`,
+  offshore `notComputable`, deterministic geometry semantics, malformed-polygon fail-closed behavior, and the
+  single-ring/no-MultiPolygon prototype constraint are covered. No product UI,
+  arbitrary map selection, live NHD download, or catalog promotion was added.
+- **RW4G complete:** feature/source evidence evaluation is separate from pure
+  deterministic policy. Lake/reservoir, river/stream, and bay/estuary/coastal
+  policies exist; hard blockers cannot be outweighed by weak evidence;
+  `needsReview` and `notComputable` remain first-class outcomes. The calibration
+  corpus includes adversarial nearest-sensor cases, deterministic review artifacts,
+  aggregate counts, automatic-acceptance precision, and a zero false-automatic-accept
+  safety metric.
+- **RW4H foundation complete:** the reviewed promotion workflow is now explicit in
+  `OceanCore`. A candidate promotes only after accepted resolution, reviewer
+  approval, reviewed source bindings, and complete capability coverage declaration.
+  Supported coverage must be backed by a matching reviewed binding, so promotion
+  cannot invent missing signals. No arbitrary product map selection or automatic
+  persistent Places were added.
+- **RW4I complete:** `placeintake` turns a reviewed RW4H promotion request plus
+  explicit feature, binding, coverage, and product-presentation verification
+  evidence into a deterministic JSON intake artifact. Missing or failed evidence,
+  incomplete coverage, unreviewed bindings, unapproved review, and non-accepted
+  resolution all fail closed. `--example` emits a repeatable request template.
+  The tool does not mutate `WaterBodies.all`, add product UI, or automatically
+  persist discovered Places.
+- **Next:** use RW4I for the next genuinely reviewed Place only when real evidence
+  exists. Phase 0 physical-watch validation and the product-scope decision remain
+  the higher-priority gates; do not manufacture catalog growth to exercise tooling.
 
 ### RW5 — Historical playback
 

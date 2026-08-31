@@ -102,6 +102,8 @@ final class PlacesAppModel {
                 )),
                 for: waterBody.id
             )
+        case let .failed(reason):
+            observations.accept(.failed(reason), for: waterBody.id)
         case .unavailable:
             observations.accept(.unavailable, for: waterBody.id)
         }

@@ -13,8 +13,11 @@ final class RealWaterAppCoordinator {
         category: "RealWater"
     )
     private var task: Task<Void, Never>?
+    private let forceFailure: Bool
 
-    init(forceFailure: Bool = false) {}
+    init(forceFailure: Bool = false) {
+        self.forceFailure = forceFailure
+    }
 
     func activate(
         waterBody: WaterBody?,
@@ -23,7 +26,15 @@ final class RealWaterAppCoordinator {
     ) {
         task?.cancel()
         task = nil
-        onLoadState(.inactive)
+        guard let waterBody else {
+            onLoadState(.inactive)
+            return
+        }
+        if forceFailure {
+            onLoadState(.failed(waterBody.id, "Real Water is unavailable on watch"))
+        } else {
+            onLoadState(.unavailable(waterBody.id))
+        }
         Self.logger.debug("Watch app excludes real-water provider networking")
     }
 

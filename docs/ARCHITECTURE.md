@@ -1,7 +1,9 @@
 # Architecture
 
 How Slosh renders and drives water on a device that offers almost no way to
-draw per-pixel.
+draw per-pixel. The canonical product doctrine is
+[PRODUCT_DOCTRINE.md](PRODUCT_DOCTRINE.md): Slosh renders expressive real-water
+representations from trustworthy evidence, not exact hydrodynamic simulations.
 
 ## The platform constraint
 
@@ -133,8 +135,25 @@ monitoring-location identity, site class, coordinates, and HUC. Both emit
 explicit evidence. Station distance is always labeled `proximityOnly`. USGS
 location metadata claims no measurement capabilities, and NOAA capabilities are
 accepted only as separately reviewed input. Consequently metadata alone cannot
-produce an accepted resolution or a `WaterBody`. Geographic feature resolution
-remains fixture-backed and no adapter is wired into product UI.
+produce an accepted resolution or a `WaterBody`.
+
+RW4F adds the portable authoritative feature resolution seam. `OceanCore` owns
+provider-independent feature identities, explicit `GeographicFeatureKind`,
+feature provenance, minimal deterministic polygon containment with boundary-as-
+contained semantics, the resolver protocol, and composition policy. NHD/NHDPlus-
+shaped fixture DTO decoding remains in `HydroProviders`; `resolutioncheck` wires
+those fixtures to RW4E-style observation candidates and writes deterministic
+research artifacts with full feature and observation candidate evidence. Product
+UI and catalog promotion are still excluded.
+
+RW4G makes source representativeness the explicit prerequisite for environmental
+forcing. `CandidateEvidenceEvaluator` normalizes feature/source evidence without
+networking or thresholds. `ResolutionPolicy` is pure and deterministic, with
+class-specific lake/reservoir, river/stream, and bay/estuary/coastal rules. Hard
+blockers cannot be outweighed by weak positives, and proximity/HUC/name evidence
+are never identity rules. This policy remains upstream of `HydroState`; source
+selection policy does not leak into `HydroInterpreter`, `SurfaceDriver`, or the
+renderer, which continue to consume provider-independent normalized state.
 
 ## Rendering
 

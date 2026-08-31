@@ -42,7 +42,7 @@ public struct WaterBody: Identifiable, Sendable, Equatable {
     }
 }
 
-public enum HydroCoverageAvailability: String, Sendable, Equatable {
+public enum HydroCoverageAvailability: String, Sendable, Equatable, Codable {
     case supported
     case unavailable
 }
@@ -107,7 +107,7 @@ public enum WaterBodies {
             ),
             HydroSourceBinding(
                 namespace: "gov.noaa.coops.current-station",
-                sourceID: "s09010",
+                sourceID: "s10010",
                 capabilities: [.currentSpeed, .currentDirection],
                 parameters: ["bin": "2"]
             ),

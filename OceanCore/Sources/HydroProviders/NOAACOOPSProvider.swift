@@ -43,8 +43,13 @@ public protocol NOAADataTransport: Sendable {
 public struct URLSessionNOAATransport: NOAADataTransport, @unchecked Sendable {
     private let session: URLSession
 
+    /// Shared rather than per-instance: `URLSession` retains itself until
+    /// `invalidateAndCancel()`, so building one per transport leaked a session
+    /// on every `RoutedHydroProvider.liveCurated()` call.
+    private static let defaultSession = makeDefaultSession()
+
     public init(session: URLSession? = nil) {
-        self.session = session ?? Self.makeDefaultSession()
+        self.session = session ?? Self.defaultSession
     }
 
     public static func makeDefaultSession() -> URLSession {

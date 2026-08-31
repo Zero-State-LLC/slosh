@@ -11,19 +11,15 @@ permissions:
 
 jobs:
   analyze:
-    name: Analyze
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [javascript, python]
+    name: Analyze (swift)
+    runs-on: macos-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
-          languages: ${{ matrix.language }}
+          languages: swift
       - name: Autobuild
         uses: github/codeql-action/autobuild@v3
       - name: Analyze

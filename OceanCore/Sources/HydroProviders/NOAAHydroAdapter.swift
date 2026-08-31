@@ -98,24 +98,60 @@ public enum NOAAHydroAdapter {
         return sample
     }
 
+    /// CO-OPS QC flags vary by product, and water_level carries a leading
+    /// sample *count* rather than a boolean. The per-product policy lives in
+    /// `qualityFlagPolicy` below.
+    ///
+    /// `product` is deliberately not defaulted: defaulting it to `.waterLevel`
+    /// means a caller who forgets the argument silently gets water-level
+    /// semantics applied to wind, which drops a real QC failure on the floor.
     public static func mapQuality(
         flags: String?,
         assurance: String?,
         product: NOAAProduct
     ) -> HydroQuality {
         guard let flags, !flags.isEmpty else { return .unknown }
-        let values = flags.split(separator: ",", omittingEmptySubsequences: false)
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-        // water_level `f` is O,F,R,L: O is an outlier *count*, not a boolean.
-        // Wind is (X,R); air pressure and water temperature are (X,N,R) — all booleans.
-        let booleanFlags = product == .waterLevel ? values.dropFirst() : values[...]
-        if booleanFlags.contains(where: { $0 != "0" }) {
+        let values = Array(flags.split(separator: ",", omittingEmptySubsequences: false))
+        let relevantFlags = relevantQualityFlags(for: product, in: values)
+
+        if relevantFlags.contains(where: { $0.trimmingCharacters(in: .whitespaces) != "0" }) {
             return .suspect
         }
         if let assurance, !["p", "v"].contains(assurance.lowercased()) {
             return .unknown
         }
         return .good
+    }
+
+    /// Product-specific interpretation of NOAA quality flags:
+    /// - waterLevel: first flag is sample-count and must be dropped.
+    /// - currents/salinity: CO-OPS payloads do not carry useful QC flags.
+    /// - all others: all flags are direct QC booleans.
+    private static let qualityFlagPolicy: [NOAAProduct: QualityFlagPolicy] = [
+        .waterLevel: .skipLeading(1),
+        .currents: .ignore,
+        .salinity: .ignore
+    ]
+
+    private enum QualityFlagPolicy {
+        case useAll
+        case skipLeading(Int)
+        case ignore
+    }
+
+    private static func relevantQualityFlags(
+        for product: NOAAProduct,
+        in values: [Substring]
+    ) -> ArraySlice<Substring> {
+        let policy = qualityFlagPolicy[product] ?? .useAll
+        switch policy {
+        case .useAll:
+            return values[...]
+        case let .skipLeading(count):
+            return values.dropFirst(count)
+        case .ignore:
+            return []
+        }
     }
 
     public static func parseTimestamp(_ value: String) -> Date? {

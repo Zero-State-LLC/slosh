@@ -1,6 +1,27 @@
 # Real Water
 
-> **Slosh lets you wear the state of a real body of water.**
+> **Slosh lets you wear a stylized, evidence-grounded representation of the current state of a real body of water.**
+
+Real Water is governed by the canonical
+[Product Doctrine](PRODUCT_DOCTRINE.md): environmental representation is not a
+scientific hydrodynamic simulation. Slosh is not CFD, a navigation tool, a
+marine safety instrument, or an exact local model. It is expressive water driven
+only by trustworthy environmental evidence.
+
+The source rule is literal: a data source may drive Slosh only when there is
+sufficient evidence that it represents the selected water body. Proximity alone
+is never enough. Missing signals remain missing. Uncertain source relationships
+stay `needsReview` or `notComputable`.
+
+The pipeline is:
+
+```text
+provider observation
+→ normalized evidence
+→ HydroState
+→ perceptual interpretation
+→ stylized visual
+```
 
 Real Water is a planned product domain. It extends Slosh without replacing the
 authored experiences that already define the app.
@@ -38,7 +59,7 @@ RW4B presents the same reviewed catalog through a MapKit map and the existing
 list. Every annotation is derived from a canonical `WaterBody.id`, latitude, and
 longitude. A pin represents San Francisco Bay, Monterey Bay, or Lake Tahoe as a
 product Place. It never represents NOAA station `9414290`, current station
-`s09010`, USGS site `10337000`, or any other sensor.
+`s10010`, USGS site `10337000`, or any other sensor.
 
 The map consumes the same keyed observation store and provider-independent Place
 status used by the list. It remains complete offline and shows loading,
@@ -76,6 +97,58 @@ capabilities can be attached only through a separate reviewed input. These APIs
 remain research tooling, create no `WaterBody`, do not change the curated catalog,
 and are not connected to the iPhone map.
 
+RW4F adds a research-only authoritative feature resolver prototype. The primary
+Lake Tahoe path uses a captured, generalized polygon and stable feature ID from
+the official USGS The National Map NHDPlus High Resolution `NHDWaterbody`
+service. NHD-specific DTO adaptation stays outside `OceanCore`, then composes
+portable feature identity, feature class, provenance, geometry/version, name,
+hydrologic ID, and containment evidence with provider candidates in
+`resolutioncheck`. Synthetic NHDPlus-schema scenario geometry is labeled as such
+and is used only for the bounded river policy and conservative San Francisco Bay
+`needsReview` cases. The accepted Tahoe case, explicit nearby Truckee River
+mismatch, river/flowline `needsReview`, coastal `needsReview`, and offshore
+`notComputable` are deterministic artifacts only. Geometry semantics are documented and tested: inside contains,
+outside excludes, boundary contains for candidate generation, malformed polygons
+fail closed, and MultiPolygon input is excluded from the prototype. No arbitrary
+map selection, product UI, live NHD fetch, or new Place is shipped.
+
+RW4G calibrates the truth gate between authoritative features and observation
+candidates. Evidence collection and policy are separate: `CandidateEvidenceEvaluator`
+normalizes the evidence, while `ResolutionPolicy` applies deterministic
+class-specific rules for lake/reservoir, river/stream, and bay/estuary/coastal
+features. The calibration corpus intentionally favors false-positive prevention:
+distance, HUC, and name evidence never accept by themselves; hard blockers such
+as wrong feature, wrong class, land barrier, disconnected network, wrong
+tributary, missing required product, or explicit metadata conflict cannot be
+outweighed by weak positives. `resolutioncheck` emits deterministic RW4G review
+artifacts and currently reports zero false automatic accepts. RW4G still adds no
+normal product UI, no arbitrary map selection, and no automatic WaterBody
+promotion.
+
+RW4H adds the reviewed promotion workflow boundary. A resolution candidate can
+become a `WaterBody` only when the decision is accepted, a reviewer approval is
+recorded, reviewed source bindings are supplied, and every `HydroCapability` has
+an explicit coverage declaration. Supported coverage must be backed by a reviewed
+binding for that capability; unavailable coverage remains explicit. The workflow
+turns a reviewed artifact into a promotion request, not an automatic discovery
+backend or product UI.
+
+RW4I makes that review boundary repeatable. From `OceanCore`, run:
+
+```bash
+swift run placeintake --example --output intake-request.json
+swift run placeintake --input intake-request.json --output intake-artifact.json
+```
+
+The request records the RW4H promotion input plus four required verification
+classes: authoritative feature identity, source binding, capability coverage, and
+product presentation. Every class must be present and verified. The command then
+re-runs the promotion gate and emits stable, sorted JSON containing the approved
+Place, reviewed bindings, explicit coverage, reviewer identity, review time, and
+decision reasons. The example contains visible replacement markers and is a
+template, not evidence. `placeintake` never edits `WaterBodies.all`, writes product
+state, or exposes arbitrary map discovery.
+
 ## Two domains
 
 - **Experiences** are the existing authored `OceanTheme` modes. They define a
@@ -85,11 +158,19 @@ and are not connected to the iPhone map.
 
 ## Data boundary
 
-Provider-specific data stops before the portable engine:
+Provider-specific data stops before the portable engine. Source confidence and
+signal coverage are tracked separately before rendering:
 
 ```text
-Provider DTO → HydroState → HydroInterpreter → HydroExperience
+Provider DTO → normalized evidence → HydroState → HydroInterpreter → HydroExperience
 ```
+
+- **Source confidence:** are these observations representative of the selected
+  water body?
+- **Coverage:** which environmental variables are actually observed?
+
+A representative source may support only water level. Acceptance never implies
+complete Hydro coverage.
 
 `HydroState` retains measurement units, origin, quality, and source identity.
 `HydroInterpreter` deterministically translates valid measurements into
@@ -278,7 +359,7 @@ bindings:
 | Binding | Why it exists | Products used |
 |---|---|---|
 | San Francisco `9414290` | Active water-level and meteorological station near the Golden Gate | `water_level`, `wind`, `air_pressure` |
-| Oakland Outer Harbor LB3 `s09010`, bin `2` | Active San Francisco Bay PORTS current station; NOAA identifies bin 2 as its real-time bin | `currents` |
+| Oakland Inner Harbor LB4 `s10010`, bin `2` | Active San Francisco Bay PORTS current station; NOAA identifies bin 2 as its real-time bin. Replaced Oakland Outer Harbor LB3 `s09010`, which stopped answering `date=latest` for roughly 45% of wall clock | `currents` |
 
 Coverage is intentionally not uniform:
 
@@ -287,7 +368,7 @@ Coverage is intentionally not uniform:
 | Water level | Available from `9414290` |
 | Wind speed and direction | Available from `9414290` |
 | Air pressure | Available from `9414290` |
-| Current speed and direction | Available from separate station `s09010`, bin 2 |
+| Current speed and direction | Available from separate station `s10010`, bin 2 |
 | Water temperature | Unavailable: the `9414290` sensor is inactive and NOAA reports no current data |
 | Salinity | Unavailable at the selected station |
 | Wave height and period | Unsupported in this slice; remain `nil` |
@@ -348,7 +429,7 @@ RW3 keeps the catalog deliberately small and reviewed:
 
 | Place | Provider source | Reviewed observed coverage |
 |---|---|---|
-| San Francisco Bay | NOAA CO-OPS `9414290`; currents `s09010` bin 2 | water level, wind, pressure, current speed and direction |
+| San Francisco Bay | NOAA CO-OPS `9414290`; currents `s10010` bin 2 | water level, wind, pressure, current speed and direction |
 | Monterey Bay | NOAA CO-OPS `9413450` | water level, water temperature, pressure |
 | Lake Tahoe | USGS NWIS instantaneous values `10337000` | gage height as water level |
 

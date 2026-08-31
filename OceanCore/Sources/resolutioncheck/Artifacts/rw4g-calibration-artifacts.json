@@ -1,0 +1,1292 @@
+{
+  "cases" : [
+    {
+      "caseID" : "A1-sensor-across-narrow-peninsula-rejected",
+      "decision" : "rejected",
+      "decisionReasons" : [
+        "Land barrier separates the candidate source from the selected feature."
+      ],
+      "evidence" : [
+        {
+          "kind" : "authoritativeFeatureClass",
+          "note" : "Feature class maps to product kind lake.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "supporting"
+        },
+        {
+          "kind" : "landBarrierOrDistinctBasin",
+          "note" : "Land barrier separates the candidate source from the selected feature.",
+          "source" : "fixture topology",
+          "strength" : "hardBlocker"
+        },
+        {
+          "kind" : "productAvailable",
+          "note" : "Product exists but land barrier blocks acceptance.",
+          "source" : "fixture product catalog",
+          "strength" : "required"
+        },
+        {
+          "kind" : "proximityOnly",
+          "note" : "Sensor is close across a narrow peninsula.",
+          "source" : "distance",
+          "strength" : "weakRankingOnly"
+        },
+        {
+          "kind" : "selectedPointContainedByFeature",
+          "note" : "Selected point is contained by Lake Tahoe.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "strong"
+        }
+      ],
+      "expectedDecision" : "rejected",
+      "featureIdentity" : {
+        "id" : "44560536",
+        "kind" : "lake",
+        "name" : "Lake Tahoe",
+        "namespace" : "gov.usgs.nhdplus"
+      },
+      "hardBlockers" : [
+        {
+          "kind" : "landBarrierOrDistinctBasin",
+          "note" : "Land barrier separates the candidate source from the selected feature.",
+          "source" : "fixture topology",
+          "strength" : "hardBlocker"
+        }
+      ],
+      "input" : {
+        "latitude" : 39.0968,
+        "longitude" : -120.0324
+      },
+      "knownRepresentative" : false,
+      "observationCandidate" : {
+        "capabilities" : [
+          "waterLevel"
+        ],
+        "distanceMeters" : 350,
+        "locationKind" : "lake",
+        "name" : "Emerald Bay Across Ridge",
+        "namespace" : "gov.usgs.waterdata.site",
+        "sourceID" : "PENINSULA-ACROSS"
+      }
+    },
+    {
+      "caseID" : "A2-lake-outlet-river-gauge-near-polygon-rejected",
+      "decision" : "rejected",
+      "decisionReasons" : [
+        "Outlet gauge belongs to the river network, not the selected lake feature.",
+        "Outlet gauge is river\/stream, not lake\/reservoir."
+      ],
+      "evidence" : [
+        {
+          "kind" : "authoritativeFeatureClass",
+          "note" : "Feature class maps to product kind lake.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "supporting"
+        },
+        {
+          "kind" : "conflictingFeature",
+          "note" : "Outlet gauge belongs to the river network, not the selected lake feature.",
+          "source" : "NHDPlus HR topology fixture",
+          "strength" : "hardBlocker"
+        },
+        {
+          "kind" : "productAvailable",
+          "note" : "Product exists but conflict blocks acceptance.",
+          "source" : "fixture product catalog",
+          "strength" : "required"
+        },
+        {
+          "kind" : "proximityOnly",
+          "note" : "Outlet river gauge is near the lake polygon.",
+          "source" : "distance",
+          "strength" : "weakRankingOnly"
+        },
+        {
+          "kind" : "selectedPointContainedByFeature",
+          "note" : "Selected point is contained by Lake Tahoe.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "strong"
+        },
+        {
+          "kind" : "wrongWaterBodyClass",
+          "note" : "Outlet gauge is river\/stream, not lake\/reservoir.",
+          "source" : "USGS site_type",
+          "strength" : "hardBlocker"
+        }
+      ],
+      "expectedDecision" : "rejected",
+      "featureIdentity" : {
+        "id" : "44560536",
+        "kind" : "lake",
+        "name" : "Lake Tahoe",
+        "namespace" : "gov.usgs.nhdplus"
+      },
+      "hardBlockers" : [
+        {
+          "kind" : "conflictingFeature",
+          "note" : "Outlet gauge belongs to the river network, not the selected lake feature.",
+          "source" : "NHDPlus HR topology fixture",
+          "strength" : "hardBlocker"
+        },
+        {
+          "kind" : "wrongWaterBodyClass",
+          "note" : "Outlet gauge is river\/stream, not lake\/reservoir.",
+          "source" : "USGS site_type",
+          "strength" : "hardBlocker"
+        }
+      ],
+      "input" : {
+        "latitude" : 39.0968,
+        "longitude" : -120.0324
+      },
+      "knownRepresentative" : false,
+      "observationCandidate" : {
+        "capabilities" : [
+          "waterLevel"
+        ],
+        "distanceMeters" : 900,
+        "locationKind" : "river",
+        "name" : "TRUCKEE R A TAHOE CITY CA",
+        "namespace" : "gov.usgs.waterdata.site",
+        "sourceID" : "10338000"
+      }
+    },
+    {
+      "caseID" : "A3-adjacent-lake-nearest-sensor-rejected",
+      "decision" : "rejected",
+      "decisionReasons" : [
+        "Source belongs to an adjacent lake feature."
+      ],
+      "evidence" : [
+        {
+          "kind" : "authoritativeFeatureClass",
+          "note" : "Feature class maps to product kind lake.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "supporting"
+        },
+        {
+          "kind" : "conflictingFeature",
+          "note" : "Source belongs to an adjacent lake feature.",
+          "source" : "authoritative feature fixture",
+          "strength" : "hardBlocker"
+        },
+        {
+          "kind" : "nameAgreement",
+          "note" : "Nearby lake name is similar regional evidence only.",
+          "source" : "normalized place name",
+          "strength" : "supporting"
+        },
+        {
+          "kind" : "productAvailable",
+          "note" : "Product exists but adjacent feature blocks acceptance.",
+          "source" : "fixture product catalog",
+          "strength" : "required"
+        },
+        {
+          "kind" : "selectedPointContainedByFeature",
+          "note" : "Selected point is contained by Lake Tahoe.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "strong"
+        }
+      ],
+      "expectedDecision" : "rejected",
+      "featureIdentity" : {
+        "id" : "44560536",
+        "kind" : "lake",
+        "name" : "Lake Tahoe",
+        "namespace" : "gov.usgs.nhdplus"
+      },
+      "hardBlockers" : [
+        {
+          "kind" : "conflictingFeature",
+          "note" : "Source belongs to an adjacent lake feature.",
+          "source" : "authoritative feature fixture",
+          "strength" : "hardBlocker"
+        }
+      ],
+      "input" : {
+        "latitude" : 39.0968,
+        "longitude" : -120.0324
+      },
+      "knownRepresentative" : false,
+      "observationCandidate" : {
+        "capabilities" : [
+          "waterLevel"
+        ],
+        "distanceMeters" : 4000,
+        "locationKind" : "lake",
+        "name" : "Fallen Leaf Lake",
+        "namespace" : "gov.usgs.waterdata.site",
+        "sourceID" : "ADJACENT-LAKE"
+      }
+    },
+    {
+      "caseID" : "A4-tributaries-near-confluence-rejected",
+      "decision" : "rejected",
+      "decisionReasons" : [
+        "Source is on a different tributary just before confluence."
+      ],
+      "evidence" : [
+        {
+          "kind" : "authoritativeFeatureClass",
+          "note" : "Feature class maps to product kind river.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "supporting"
+        },
+        {
+          "kind" : "productAvailable",
+          "note" : "Product exists but wrong tributary blocks acceptance.",
+          "source" : "fixture product catalog",
+          "strength" : "required"
+        },
+        {
+          "kind" : "proximityOnly",
+          "note" : "Tributary source is close to confluence.",
+          "source" : "distance",
+          "strength" : "weakRankingOnly"
+        },
+        {
+          "kind" : "selectedPointContainedByFeature",
+          "note" : "Selected point is contained by Truckee River.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "strong"
+        },
+        {
+          "kind" : "wrongTributary",
+          "note" : "Source is on a different tributary just before confluence.",
+          "source" : "topology fixture",
+          "strength" : "hardBlocker"
+        }
+      ],
+      "expectedDecision" : "rejected",
+      "featureIdentity" : {
+        "id" : "NHDHR-16050102-TRUCKEE-RIVER-FIXTURE",
+        "kind" : "river",
+        "name" : "Truckee River",
+        "namespace" : "research.rw4f.fixture"
+      },
+      "hardBlockers" : [
+        {
+          "kind" : "wrongTributary",
+          "note" : "Source is on a different tributary just before confluence.",
+          "source" : "topology fixture",
+          "strength" : "hardBlocker"
+        }
+      ],
+      "input" : {
+        "latitude" : 39.327,
+        "longitude" : -120.205
+      },
+      "knownRepresentative" : false,
+      "observationCandidate" : {
+        "capabilities" : [
+          "waterLevel"
+        ],
+        "distanceMeters" : 120,
+        "locationKind" : "river",
+        "name" : "Tributary near Truckee confluence",
+        "namespace" : "gov.usgs.waterdata.site",
+        "sourceID" : "CONFLUENCE-TRIBUTARY"
+      }
+    },
+    {
+      "caseID" : "A5-estuary-versus-open-coast-station-rejected",
+      "decision" : "rejected",
+      "decisionReasons" : [
+        "Station metadata identifies open coast rather than the selected bay\/estuary."
+      ],
+      "evidence" : [
+        {
+          "kind" : "authoritativeFeatureClass",
+          "note" : "Feature class maps to product kind bay.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "supporting"
+        },
+        {
+          "kind" : "explicitMetadataConflict",
+          "note" : "Station metadata identifies open coast rather than the selected bay\/estuary.",
+          "source" : "station metadata",
+          "strength" : "hardBlocker"
+        },
+        {
+          "kind" : "productAvailable",
+          "note" : "Product exists but metadata conflict blocks acceptance.",
+          "source" : "fixture product catalog",
+          "strength" : "required"
+        },
+        {
+          "kind" : "proximityOnly",
+          "note" : "Open-coast station is close to the bay.",
+          "source" : "NOAA CO-OPS MDAPI",
+          "strength" : "weakRankingOnly"
+        },
+        {
+          "kind" : "selectedPointContainedByFeature",
+          "note" : "Selected point is contained by San Francisco Bay.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "strong"
+        }
+      ],
+      "expectedDecision" : "rejected",
+      "featureIdentity" : {
+        "id" : "NHDHR-18050004-SAN-FRANCISCO-BAY-AREA-FIXTURE",
+        "kind" : "bay",
+        "name" : "San Francisco Bay",
+        "namespace" : "research.rw4f.fixture"
+      },
+      "hardBlockers" : [
+        {
+          "kind" : "explicitMetadataConflict",
+          "note" : "Station metadata identifies open coast rather than the selected bay\/estuary.",
+          "source" : "station metadata",
+          "strength" : "hardBlocker"
+        }
+      ],
+      "input" : {
+        "latitude" : 37.806305,
+        "longitude" : -122.46589
+      },
+      "knownRepresentative" : false,
+      "observationCandidate" : {
+        "capabilities" : [
+          "waterLevel"
+        ],
+        "distanceMeters" : 6500,
+        "locationKind" : "ocean",
+        "name" : "San Francisco Ocean Beach",
+        "namespace" : "gov.noaa.coops.station",
+        "sourceID" : "OPEN-COAST"
+      }
+    },
+    {
+      "caseID" : "A6-similar-name-different-feature-rejected",
+      "decision" : "rejected",
+      "decisionReasons" : [
+        "Candidate source belongs to a creek feature, not San Francisco Bay."
+      ],
+      "evidence" : [
+        {
+          "kind" : "authoritativeFeatureClass",
+          "note" : "Feature class maps to product kind bay.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "supporting"
+        },
+        {
+          "kind" : "explicitMetadataConflict",
+          "note" : "Candidate source belongs to a creek feature, not San Francisco Bay.",
+          "source" : "authoritative feature fixture",
+          "strength" : "hardBlocker"
+        },
+        {
+          "kind" : "nameAgreement",
+          "note" : "Name contains San Francisco but names are not identity.",
+          "source" : "normalized station name",
+          "strength" : "supporting"
+        },
+        {
+          "kind" : "productAvailable",
+          "note" : "Product exists but feature mismatch blocks acceptance.",
+          "source" : "fixture product catalog",
+          "strength" : "required"
+        },
+        {
+          "kind" : "selectedPointContainedByFeature",
+          "note" : "Selected point is contained by San Francisco Bay.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "strong"
+        }
+      ],
+      "expectedDecision" : "rejected",
+      "featureIdentity" : {
+        "id" : "NHDHR-18050004-SAN-FRANCISCO-BAY-AREA-FIXTURE",
+        "kind" : "bay",
+        "name" : "San Francisco Bay",
+        "namespace" : "research.rw4f.fixture"
+      },
+      "hardBlockers" : [
+        {
+          "kind" : "explicitMetadataConflict",
+          "note" : "Candidate source belongs to a creek feature, not San Francisco Bay.",
+          "source" : "authoritative feature fixture",
+          "strength" : "hardBlocker"
+        }
+      ],
+      "input" : {
+        "latitude" : 37.806305,
+        "longitude" : -122.46589
+      },
+      "knownRepresentative" : false,
+      "observationCandidate" : {
+        "capabilities" : [
+          "waterLevel"
+        ],
+        "distanceMeters" : 8000,
+        "locationKind" : "river",
+        "name" : "San Francisco Creek",
+        "namespace" : "gov.usgs.waterdata.site",
+        "sourceID" : "SF-NAME-OTHER"
+      }
+    },
+    {
+      "caseID" : "C1-sf-bay-reviewed-source-relationship-accepted",
+      "decision" : "accepted",
+      "decisionReasons" : [
+        "Coastal policy accepted only because a reviewed maintained source relationship exists"
+      ],
+      "evidence" : [
+        {
+          "kind" : "authoritativeFeatureClass",
+          "note" : "Feature class maps to product kind bay.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "supporting"
+        },
+        {
+          "kind" : "compatibleWaterBodyClass",
+          "note" : "Tidal station is compatible with bay\/estuary feature.",
+          "source" : "NOAA station metadata",
+          "strength" : "strong"
+        },
+        {
+          "kind" : "productAvailable",
+          "note" : "Reviewed products are explicitly available.",
+          "source" : "Reviewed NOAA CO-OPS capability input",
+          "strength" : "required"
+        },
+        {
+          "kind" : "reviewedSourceRelationship",
+          "note" : "Existing reviewed San Francisco Bay Place binds NOAA station 9414290 for water level, wind, and pressure.",
+          "source" : "Curated Slosh source binding",
+          "strength" : "identity"
+        },
+        {
+          "kind" : "selectedPointContainedByFeature",
+          "note" : "Selected point is contained by San Francisco Bay.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "strong"
+        }
+      ],
+      "expectedDecision" : "accepted",
+      "featureIdentity" : {
+        "id" : "NHDHR-18050004-SAN-FRANCISCO-BAY-AREA-FIXTURE",
+        "kind" : "bay",
+        "name" : "San Francisco Bay",
+        "namespace" : "research.rw4f.fixture"
+      },
+      "hardBlockers" : [
+
+      ],
+      "input" : {
+        "latitude" : 37.806305,
+        "longitude" : -122.46589
+      },
+      "knownRepresentative" : true,
+      "observationCandidate" : {
+        "capabilities" : [
+          "airPressure",
+          "waterLevel",
+          "wind"
+        ],
+        "distanceMeters" : 0,
+        "locationKind" : "estuary",
+        "name" : "San Francisco",
+        "namespace" : "gov.noaa.coops.station",
+        "sourceID" : "9414290"
+      }
+    },
+    {
+      "caseID" : "C2-sf-bay-nearby-unrelated-coastal-station-rejected",
+      "decision" : "rejected",
+      "decisionReasons" : [
+        "Station is separated from the selected bay by a headland\/open-coast water mass."
+      ],
+      "evidence" : [
+        {
+          "kind" : "authoritativeFeatureClass",
+          "note" : "Feature class maps to product kind bay.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "supporting"
+        },
+        {
+          "kind" : "landBarrierOrDistinctBasin",
+          "note" : "Station is separated from the selected bay by a headland\/open-coast water mass.",
+          "source" : "coastal topology fixture",
+          "strength" : "hardBlocker"
+        },
+        {
+          "kind" : "productAvailable",
+          "note" : "Product exists but distinct basin blocks acceptance.",
+          "source" : "fixture product catalog",
+          "strength" : "required"
+        },
+        {
+          "kind" : "proximityOnly",
+          "note" : "Station is nearby but outside the bay relationship.",
+          "source" : "NOAA CO-OPS MDAPI",
+          "strength" : "weakRankingOnly"
+        },
+        {
+          "kind" : "selectedPointContainedByFeature",
+          "note" : "Selected point is contained by San Francisco Bay.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "strong"
+        }
+      ],
+      "expectedDecision" : "rejected",
+      "featureIdentity" : {
+        "id" : "NHDHR-18050004-SAN-FRANCISCO-BAY-AREA-FIXTURE",
+        "kind" : "bay",
+        "name" : "San Francisco Bay",
+        "namespace" : "research.rw4f.fixture"
+      },
+      "hardBlockers" : [
+        {
+          "kind" : "landBarrierOrDistinctBasin",
+          "note" : "Station is separated from the selected bay by a headland\/open-coast water mass.",
+          "source" : "coastal topology fixture",
+          "strength" : "hardBlocker"
+        }
+      ],
+      "input" : {
+        "latitude" : 37.806305,
+        "longitude" : -122.46589
+      },
+      "knownRepresentative" : false,
+      "observationCandidate" : {
+        "capabilities" : [
+          "waterLevel"
+        ],
+        "distanceMeters" : 3200,
+        "locationKind" : "ocean",
+        "name" : "Outer Coast Test Station",
+        "namespace" : "gov.noaa.coops.station",
+        "sourceID" : "9419999"
+      }
+    },
+    {
+      "caseID" : "C3-plausible-bay-station-without-association-needs-review",
+      "decision" : "needsReview",
+      "decisionReasons" : [
+        "Coastal\/bay evidence remains conservative without an authoritative basin or reviewed station relationship"
+      ],
+      "evidence" : [
+        {
+          "kind" : "authoritativeFeatureClass",
+          "note" : "Feature class maps to product kind bay.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "supporting"
+        },
+        {
+          "kind" : "compatibleWaterBodyClass",
+          "note" : "Tidal station is compatible with bay\/estuary feature.",
+          "source" : "NOAA station metadata",
+          "strength" : "strong"
+        },
+        {
+          "kind" : "nameAgreement",
+          "note" : "Bay name overlaps; name agreement is supporting evidence only.",
+          "source" : "normalized station name",
+          "strength" : "supporting"
+        },
+        {
+          "kind" : "productAvailable",
+          "note" : "Water level product is available.",
+          "source" : "fixture product catalog",
+          "strength" : "required"
+        },
+        {
+          "kind" : "proximityOnly",
+          "note" : "Station is plausible and nearby, but proximity is not identity.",
+          "source" : "NOAA CO-OPS MDAPI",
+          "strength" : "weakRankingOnly"
+        },
+        {
+          "kind" : "selectedPointContainedByFeature",
+          "note" : "Selected point is contained by San Francisco Bay.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "strong"
+        }
+      ],
+      "expectedDecision" : "needsReview",
+      "featureIdentity" : {
+        "id" : "NHDHR-18050004-SAN-FRANCISCO-BAY-AREA-FIXTURE",
+        "kind" : "bay",
+        "name" : "San Francisco Bay",
+        "namespace" : "research.rw4f.fixture"
+      },
+      "hardBlockers" : [
+
+      ],
+      "input" : {
+        "latitude" : 37.806305,
+        "longitude" : -122.46589
+      },
+      "observationCandidate" : {
+        "capabilities" : [
+          "waterLevel"
+        ],
+        "distanceMeters" : 11000,
+        "locationKind" : "estuary",
+        "name" : "San Francisco Bay North",
+        "namespace" : "gov.noaa.coops.station",
+        "sourceID" : "9410001"
+      }
+    },
+    {
+      "caseID" : "C4-offshore-point-not-computable",
+      "decision" : "notComputable",
+      "decisionReasons" : [
+        "Offshore point lacks a bounded authoritative water feature in the fixture corpus."
+      ],
+      "evidence" : [
+        {
+          "kind" : "unsupportedRegion",
+          "note" : "Offshore point lacks a bounded authoritative water feature in the fixture corpus.",
+          "source" : "Authoritative feature index",
+          "strength" : "notComputable"
+        }
+      ],
+      "expectedDecision" : "notComputable",
+      "hardBlockers" : [
+
+      ],
+      "input" : {
+        "latitude" : 36.7,
+        "longitude" : -123.8
+      }
+    },
+    {
+      "caseID" : "L1-tahoe-correct-station-accepted",
+      "decision" : "accepted",
+      "decisionReasons" : [
+        "Lake\/reservoir policy accepted: selected point, source identity, class, and product evidence all agree"
+      ],
+      "evidence" : [
+        {
+          "kind" : "authoritativeFeatureClass",
+          "note" : "Feature class maps to product kind lake.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "supporting"
+        },
+        {
+          "kind" : "compatibleWaterBodyClass",
+          "note" : "Monitoring location is classified as lake\/reservoir.",
+          "source" : "USGS site_type",
+          "strength" : "strong"
+        },
+        {
+          "kind" : "productAvailable",
+          "note" : "Water level product is explicitly reviewed as available.",
+          "source" : "Reviewed USGS capability input",
+          "strength" : "required"
+        },
+        {
+          "kind" : "sameHydrologicUnit",
+          "note" : "HUC matches Lake Tahoe and is supporting evidence only.",
+          "source" : "USGS hydrologic_unit_code",
+          "strength" : "supporting"
+        },
+        {
+          "kind" : "selectedPointContainedByFeature",
+          "note" : "Selected point is contained by Lake Tahoe.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "strong"
+        },
+        {
+          "kind" : "sourceContainedByFeature",
+          "note" : "Reviewed source coordinate is inside the same Lake Tahoe polygon.",
+          "source" : "NHDPlus HR fixture overlay",
+          "strength" : "identity"
+        }
+      ],
+      "expectedDecision" : "accepted",
+      "featureIdentity" : {
+        "id" : "44560536",
+        "kind" : "lake",
+        "name" : "Lake Tahoe",
+        "namespace" : "gov.usgs.nhdplus"
+      },
+      "hardBlockers" : [
+
+      ],
+      "input" : {
+        "latitude" : 39.0968,
+        "longitude" : -120.0324
+      },
+      "knownRepresentative" : true,
+      "observationCandidate" : {
+        "capabilities" : [
+          "waterLevel"
+        ],
+        "distanceMeters" : 12598,
+        "locationKind" : "lake",
+        "name" : "LAKE TAHOE A TAHOE CITY CA",
+        "namespace" : "gov.usgs.waterdata.site",
+        "sourceID" : "10337000"
+      }
+    },
+    {
+      "caseID" : "L2-tahoe-nearby-truckee-river-rejected",
+      "decision" : "rejected",
+      "decisionReasons" : [
+        "Nearest source belongs to Truckee River, not Lake Tahoe.",
+        "River site class conflicts with selected lake feature."
+      ],
+      "evidence" : [
+        {
+          "kind" : "authoritativeFeatureClass",
+          "note" : "Feature class maps to product kind lake.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "supporting"
+        },
+        {
+          "kind" : "conflictingFeature",
+          "note" : "Nearest source belongs to Truckee River, not Lake Tahoe.",
+          "source" : "NHDPlus HR fixture overlay",
+          "strength" : "hardBlocker"
+        },
+        {
+          "kind" : "productAvailable",
+          "note" : "Water level product exists but cannot override identity conflict.",
+          "source" : "Reviewed USGS capability input",
+          "strength" : "required"
+        },
+        {
+          "kind" : "proximityOnly",
+          "note" : "Truckee River gage is nearer than the lake gage; distance is ranking evidence only.",
+          "source" : "USGS monitoring-locations",
+          "strength" : "weakRankingOnly"
+        },
+        {
+          "kind" : "selectedPointContainedByFeature",
+          "note" : "Selected point is contained by Lake Tahoe.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "strong"
+        },
+        {
+          "kind" : "wrongWaterBodyClass",
+          "note" : "River site class conflicts with selected lake feature.",
+          "source" : "USGS site_type",
+          "strength" : "hardBlocker"
+        }
+      ],
+      "expectedDecision" : "rejected",
+      "featureIdentity" : {
+        "id" : "44560536",
+        "kind" : "lake",
+        "name" : "Lake Tahoe",
+        "namespace" : "gov.usgs.nhdplus"
+      },
+      "hardBlockers" : [
+        {
+          "kind" : "conflictingFeature",
+          "note" : "Nearest source belongs to Truckee River, not Lake Tahoe.",
+          "source" : "NHDPlus HR fixture overlay",
+          "strength" : "hardBlocker"
+        },
+        {
+          "kind" : "wrongWaterBodyClass",
+          "note" : "River site class conflicts with selected lake feature.",
+          "source" : "USGS site_type",
+          "strength" : "hardBlocker"
+        }
+      ],
+      "input" : {
+        "latitude" : 39.0968,
+        "longitude" : -120.0324
+      },
+      "knownRepresentative" : false,
+      "observationCandidate" : {
+        "capabilities" : [
+          "waterLevel"
+        ],
+        "distanceMeters" : 900,
+        "locationKind" : "river",
+        "name" : "TRUCKEE R A TAHOE CITY CA",
+        "namespace" : "gov.usgs.waterdata.site",
+        "sourceID" : "10338000"
+      }
+    },
+    {
+      "caseID" : "L3-tahoe-source-just-outside-polygon-needs-review",
+      "decision" : "needsReview",
+      "decisionReasons" : [
+        "Lake\/reservoir evidence exists, but automatic same-feature acceptance is not proven"
+      ],
+      "evidence" : [
+        {
+          "kind" : "authoritativeFeatureClass",
+          "note" : "Feature class maps to product kind lake.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "supporting"
+        },
+        {
+          "kind" : "compatibleWaterBodyClass",
+          "note" : "Site class is lake\/reservoir.",
+          "source" : "site metadata",
+          "strength" : "strong"
+        },
+        {
+          "kind" : "nameAgreement",
+          "note" : "Name agreement is supporting evidence only.",
+          "source" : "normalized station name",
+          "strength" : "supporting"
+        },
+        {
+          "kind" : "productAvailable",
+          "note" : "Water level product is available.",
+          "source" : "fixture product catalog",
+          "strength" : "required"
+        },
+        {
+          "kind" : "proximityOnly",
+          "note" : "Source is just outside the Tahoe polygon; proximity cannot establish same-water identity.",
+          "source" : "fixture geometry",
+          "strength" : "weakRankingOnly"
+        },
+        {
+          "kind" : "selectedPointContainedByFeature",
+          "note" : "Selected point is contained by Lake Tahoe.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "strong"
+        }
+      ],
+      "expectedDecision" : "needsReview",
+      "featureIdentity" : {
+        "id" : "44560536",
+        "kind" : "lake",
+        "name" : "Lake Tahoe",
+        "namespace" : "gov.usgs.nhdplus"
+      },
+      "hardBlockers" : [
+
+      ],
+      "input" : {
+        "latitude" : 39.0968,
+        "longitude" : -120.0324
+      },
+      "observationCandidate" : {
+        "capabilities" : [
+          "waterLevel"
+        ],
+        "distanceMeters" : 80,
+        "locationKind" : "lake",
+        "name" : "Lake Tahoe Shoreline Sensor",
+        "namespace" : "gov.usgs.waterdata.site",
+        "sourceID" : "TAHOE-OUTSIDE"
+      }
+    },
+    {
+      "caseID" : "L4-tahoe-same-feature-wrong-site-class-rejected",
+      "decision" : "rejected",
+      "decisionReasons" : [
+        "Source is classified as river\/stream while the selected feature is a lake."
+      ],
+      "evidence" : [
+        {
+          "kind" : "authoritativeFeatureClass",
+          "note" : "Feature class maps to product kind lake.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "supporting"
+        },
+        {
+          "kind" : "productAvailable",
+          "note" : "Product exists but wrong class blocks acceptance.",
+          "source" : "fixture product catalog",
+          "strength" : "required"
+        },
+        {
+          "kind" : "selectedPointContainedByFeature",
+          "note" : "Selected point is contained by Lake Tahoe.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "strong"
+        },
+        {
+          "kind" : "sourceContainedByFeature",
+          "note" : "Coordinate falls within the broad reviewed feature area.",
+          "source" : "fixture overlay",
+          "strength" : "identity"
+        },
+        {
+          "kind" : "wrongWaterBodyClass",
+          "note" : "Source is classified as river\/stream while the selected feature is a lake.",
+          "source" : "site metadata",
+          "strength" : "hardBlocker"
+        }
+      ],
+      "expectedDecision" : "rejected",
+      "featureIdentity" : {
+        "id" : "44560536",
+        "kind" : "lake",
+        "name" : "Lake Tahoe",
+        "namespace" : "gov.usgs.nhdplus"
+      },
+      "hardBlockers" : [
+        {
+          "kind" : "wrongWaterBodyClass",
+          "note" : "Source is classified as river\/stream while the selected feature is a lake.",
+          "source" : "site metadata",
+          "strength" : "hardBlocker"
+        }
+      ],
+      "input" : {
+        "latitude" : 39.0968,
+        "longitude" : -120.0324
+      },
+      "knownRepresentative" : false,
+      "observationCandidate" : {
+        "capabilities" : [
+          "waterLevel"
+        ],
+        "distanceMeters" : 200,
+        "locationKind" : "river",
+        "name" : "Lake Tahoe Outlet Channel",
+        "namespace" : "gov.usgs.waterdata.site",
+        "sourceID" : "TAHOE-RIVER-CLASS"
+      }
+    },
+    {
+      "caseID" : "L5-tahoe-same-huc-only-needs-review",
+      "decision" : "needsReview",
+      "decisionReasons" : [
+        "Lake\/reservoir evidence exists, but automatic same-feature acceptance is not proven"
+      ],
+      "evidence" : [
+        {
+          "kind" : "authoritativeFeatureClass",
+          "note" : "Feature class maps to product kind lake.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "supporting"
+        },
+        {
+          "kind" : "productAvailable",
+          "note" : "Water level product is available.",
+          "source" : "fixture product catalog",
+          "strength" : "required"
+        },
+        {
+          "kind" : "proximityOnly",
+          "note" : "Distance ranks candidates only.",
+          "source" : "distance",
+          "strength" : "weakRankingOnly"
+        },
+        {
+          "kind" : "sameHydrologicUnit",
+          "note" : "Same HUC is basin evidence; it is not source containment or same feature identity.",
+          "source" : "USGS hydrologic_unit_code",
+          "strength" : "supporting"
+        },
+        {
+          "kind" : "selectedPointContainedByFeature",
+          "note" : "Selected point is contained by Lake Tahoe.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "strong"
+        }
+      ],
+      "expectedDecision" : "needsReview",
+      "featureIdentity" : {
+        "id" : "44560536",
+        "kind" : "lake",
+        "name" : "Lake Tahoe",
+        "namespace" : "gov.usgs.nhdplus"
+      },
+      "hardBlockers" : [
+
+      ],
+      "input" : {
+        "latitude" : 39.0968,
+        "longitude" : -120.0324
+      },
+      "observationCandidate" : {
+        "capabilities" : [
+          "waterLevel"
+        ],
+        "distanceMeters" : 18000,
+        "locationKind" : "lake",
+        "name" : "Upper Tahoe Basin Stage",
+        "namespace" : "gov.usgs.waterdata.site",
+        "sourceID" : "TAHOE-HUC-ONLY"
+      }
+    },
+    {
+      "caseID" : "R1-same-authoritative-reach-accepted",
+      "decision" : "accepted",
+      "decisionReasons" : [
+        "River\/stream policy accepted: same authoritative reach, compatible source class, and product evidence agree"
+      ],
+      "evidence" : [
+        {
+          "kind" : "authoritativeFeatureClass",
+          "note" : "Feature class maps to product kind river.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "supporting"
+        },
+        {
+          "kind" : "compatibleWaterBodyClass",
+          "note" : "Monitoring location is stream\/river.",
+          "source" : "USGS site_type",
+          "strength" : "strong"
+        },
+        {
+          "kind" : "productAvailable",
+          "note" : "Water level product is available.",
+          "source" : "fixture product catalog",
+          "strength" : "required"
+        },
+        {
+          "kind" : "sameAuthoritativeReach",
+          "note" : "Monitoring location is on the same authoritative Truckee River reach.",
+          "source" : "NHDPlus HR flowline topology fixture",
+          "strength" : "identity"
+        },
+        {
+          "kind" : "selectedPointContainedByFeature",
+          "note" : "Selected point is contained by Truckee River.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "strong"
+        }
+      ],
+      "expectedDecision" : "accepted",
+      "featureIdentity" : {
+        "id" : "NHDHR-16050102-TRUCKEE-RIVER-FIXTURE",
+        "kind" : "river",
+        "name" : "Truckee River",
+        "namespace" : "research.rw4f.fixture"
+      },
+      "hardBlockers" : [
+
+      ],
+      "input" : {
+        "latitude" : 39.327,
+        "longitude" : -120.205
+      },
+      "knownRepresentative" : true,
+      "observationCandidate" : {
+        "capabilities" : [
+          "waterLevel"
+        ],
+        "distanceMeters" : 0,
+        "locationKind" : "river",
+        "name" : "TRUCKEE R NR TRUCKEE CA",
+        "namespace" : "gov.usgs.waterdata.site",
+        "sourceID" : "10338500"
+      }
+    },
+    {
+      "caseID" : "R2-same-watershed-different-tributary-rejected",
+      "decision" : "rejected",
+      "decisionReasons" : [
+        "Source is on Prosser Creek tributary, not the selected Truckee River reach."
+      ],
+      "evidence" : [
+        {
+          "kind" : "authoritativeFeatureClass",
+          "note" : "Feature class maps to product kind river.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "supporting"
+        },
+        {
+          "kind" : "productAvailable",
+          "note" : "Product exists but wrong tributary blocks acceptance.",
+          "source" : "fixture product catalog",
+          "strength" : "required"
+        },
+        {
+          "kind" : "sameHydrologicUnit",
+          "note" : "Same HUC does not prove same river reach.",
+          "source" : "USGS hydrologic_unit_code",
+          "strength" : "supporting"
+        },
+        {
+          "kind" : "selectedPointContainedByFeature",
+          "note" : "Selected point is contained by Truckee River.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "strong"
+        },
+        {
+          "kind" : "wrongTributary",
+          "note" : "Source is on Prosser Creek tributary, not the selected Truckee River reach.",
+          "source" : "NHDPlus HR topology fixture",
+          "strength" : "hardBlocker"
+        }
+      ],
+      "expectedDecision" : "rejected",
+      "featureIdentity" : {
+        "id" : "NHDHR-16050102-TRUCKEE-RIVER-FIXTURE",
+        "kind" : "river",
+        "name" : "Truckee River",
+        "namespace" : "research.rw4f.fixture"
+      },
+      "hardBlockers" : [
+        {
+          "kind" : "wrongTributary",
+          "note" : "Source is on Prosser Creek tributary, not the selected Truckee River reach.",
+          "source" : "NHDPlus HR topology fixture",
+          "strength" : "hardBlocker"
+        }
+      ],
+      "input" : {
+        "latitude" : 39.327,
+        "longitude" : -120.205
+      },
+      "knownRepresentative" : false,
+      "observationCandidate" : {
+        "capabilities" : [
+          "waterLevel"
+        ],
+        "distanceMeters" : 500,
+        "locationKind" : "river",
+        "name" : "Prosser Creek near confluence",
+        "namespace" : "gov.usgs.waterdata.site",
+        "sourceID" : "TRIBUTARY-1"
+      }
+    },
+    {
+      "caseID" : "R3-upstream-downstream-ambiguity-needs-review",
+      "decision" : "needsReview",
+      "decisionReasons" : [
+        "River\/stream topology is ambiguous; same HUC or proximity cannot prove same reach"
+      ],
+      "evidence" : [
+        {
+          "kind" : "authoritativeFeatureClass",
+          "note" : "Feature class maps to product kind river.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "supporting"
+        },
+        {
+          "kind" : "compatibleWaterBodyClass",
+          "note" : "Monitoring location is stream\/river.",
+          "source" : "USGS site_type",
+          "strength" : "strong"
+        },
+        {
+          "kind" : "productAvailable",
+          "note" : "Water level product is available.",
+          "source" : "fixture product catalog",
+          "strength" : "required"
+        },
+        {
+          "kind" : "sameHydrologicUnit",
+          "note" : "Same HUC remains supporting evidence only.",
+          "source" : "USGS hydrologic_unit_code",
+          "strength" : "supporting"
+        },
+        {
+          "kind" : "selectedPointContainedByFeature",
+          "note" : "Selected point is contained by Truckee River.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "strong"
+        },
+        {
+          "kind" : "upstreamDownstreamAmbiguous",
+          "note" : "Upstream\/downstream relation exists but representativeness for the selected reach is ambiguous.",
+          "source" : "topology fixture",
+          "strength" : "supporting"
+        }
+      ],
+      "expectedDecision" : "needsReview",
+      "featureIdentity" : {
+        "id" : "NHDHR-16050102-TRUCKEE-RIVER-FIXTURE",
+        "kind" : "river",
+        "name" : "Truckee River",
+        "namespace" : "research.rw4f.fixture"
+      },
+      "hardBlockers" : [
+
+      ],
+      "input" : {
+        "latitude" : 39.327,
+        "longitude" : -120.205
+      },
+      "observationCandidate" : {
+        "capabilities" : [
+          "waterLevel"
+        ],
+        "distanceMeters" : 1700,
+        "locationKind" : "river",
+        "name" : "Truckee River Upstream",
+        "namespace" : "gov.usgs.waterdata.site",
+        "sourceID" : "TRUCKEE-UPDOWN"
+      }
+    },
+    {
+      "caseID" : "R4-close-parallel-disconnected-channel-rejected",
+      "decision" : "rejected",
+      "decisionReasons" : [
+        "Parallel channel is disconnected from the selected Truckee River reach."
+      ],
+      "evidence" : [
+        {
+          "kind" : "authoritativeFeatureClass",
+          "note" : "Feature class maps to product kind river.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "supporting"
+        },
+        {
+          "kind" : "disconnectedNetwork",
+          "note" : "Parallel channel is disconnected from the selected Truckee River reach.",
+          "source" : "topology fixture",
+          "strength" : "hardBlocker"
+        },
+        {
+          "kind" : "productAvailable",
+          "note" : "Product exists but disconnected network blocks acceptance.",
+          "source" : "fixture product catalog",
+          "strength" : "required"
+        },
+        {
+          "kind" : "proximityOnly",
+          "note" : "Parallel channel is physically close.",
+          "source" : "distance",
+          "strength" : "weakRankingOnly"
+        },
+        {
+          "kind" : "selectedPointContainedByFeature",
+          "note" : "Selected point is contained by Truckee River.",
+          "source" : "Authoritative feature fixture",
+          "strength" : "strong"
+        }
+      ],
+      "expectedDecision" : "rejected",
+      "featureIdentity" : {
+        "id" : "NHDHR-16050102-TRUCKEE-RIVER-FIXTURE",
+        "kind" : "river",
+        "name" : "Truckee River",
+        "namespace" : "research.rw4f.fixture"
+      },
+      "hardBlockers" : [
+        {
+          "kind" : "disconnectedNetwork",
+          "note" : "Parallel channel is disconnected from the selected Truckee River reach.",
+          "source" : "topology fixture",
+          "strength" : "hardBlocker"
+        }
+      ],
+      "input" : {
+        "latitude" : 39.327,
+        "longitude" : -120.205
+      },
+      "knownRepresentative" : false,
+      "observationCandidate" : {
+        "capabilities" : [
+          "waterLevel"
+        ],
+        "distanceMeters" : 70,
+        "locationKind" : "river",
+        "name" : "Parallel Drainage Canal",
+        "namespace" : "gov.usgs.waterdata.site",
+        "sourceID" : "PARALLEL-CHANNEL"
+      }
+    }
+  ],
+  "summary" : {
+    "acceptedCount" : 3,
+    "automaticAcceptancePrecision" : 1,
+    "falseAutomaticAccepts" : 0,
+    "falseRejectsWhereKnown" : 0,
+    "fixtureCount" : 19,
+    "needsReviewCount" : 4,
+    "notComputableCount" : 1,
+    "rejectedCount" : 11
+  }
+}

@@ -605,13 +605,14 @@ Check.suite("iPhone Places selection foundation") {
         var store = PlaceObservationStore()
         store.beginLoading(WaterBodies.sanFranciscoBay.id)
         store.accept(.unavailable, for: WaterBodies.lakeTahoe.id)
+        store.accept(.failed("No network"), for: WaterBodies.montereyBay.id)
         let annotations = CuratedPlacesMapSnapshot(
             observations: store,
             selectedPlaceID: nil
         ).annotations
         Check.equal(annotations.first { $0.id == WaterBodies.sanFranciscoBay.id }?.statusText, "Loading")
         Check.equal(annotations.first { $0.id == WaterBodies.lakeTahoe.id }?.statusText, "Unavailable")
-        Check.equal(annotations.first { $0.id == WaterBodies.montereyBay.id }?.statusText, "Reviewed coverage")
+        Check.equal(annotations.first { $0.id == WaterBodies.montereyBay.id }?.statusText, "No network")
     }
 
     Check.test("map browsing does not change the worn Place") {
@@ -829,6 +830,173 @@ Check.suite("Geographic resolution candidate prototype") {
             Check.expect(false, "needs-review candidate was promoted")
         } catch {
             Check.equal(error as? ReviewedWaterBodyPromotionError, .candidateNotAccepted)
+        }
+    }
+
+    Check.test("reviewed discovery promotion requires approval and complete explicit coverage") {
+        let decision = WaterBodyResolutionEvaluator().evaluate(acceptedTahoe)
+        let reviewedBinding = ReviewedSourceBindingDeclaration(
+            namespace: tahoeSource.namespace,
+            sourceID: tahoeSource.sourceID,
+            capabilities: tahoeSource.capabilities
+        )
+        let approval = ReviewedResolutionApproval(
+            reviewerID: "fixture-reviewer",
+            reviewedAt: Date(timeIntervalSince1970: 100),
+            approved: true,
+            notes: ["source identity and water-level product verified"]
+        )
+        let completeCoverage = HydroCapability.allCases.map { capability in
+            HydroCapabilityCoverageDeclaration(
+                capability: capability,
+                availability: capability == .waterLevel ? .supported : .unavailable,
+                sourceIDs: capability == .waterLevel ? [tahoeSource.sourceID] : [],
+                note: capability == .waterLevel
+                    ? "USGS gage height is reviewed as water-level coverage."
+                    : "No reviewed source supports this signal."
+            )
+        }
+        let request = ReviewedWaterBodyPromotionRequest(
+            candidate: acceptedTahoe,
+            decision: decision,
+            approval: approval,
+            id: "reviewed-tahoe-rw4h",
+            region: "California / Nevada, USA",
+            reviewedBindings: [reviewedBinding],
+            coverage: completeCoverage
+        )
+
+        let promoted = try! ReviewedWaterBodyPromotion().promote(request)
+        Check.equal(promoted.id, "reviewed-tahoe-rw4h")
+        Check.equal(promoted.coverage[.waterLevel], .supported)
+        Check.equal(promoted.coverage[.wind], .unavailable)
+
+        let unapproved = ReviewedWaterBodyPromotionRequest(
+            candidate: acceptedTahoe,
+            decision: decision,
+            approval: ReviewedResolutionApproval(
+                reviewerID: "fixture-reviewer",
+                reviewedAt: Date(timeIntervalSince1970: 101),
+                approved: false,
+                notes: ["not approved"]
+            ),
+            id: "unsafe-unapproved",
+            region: "Unknown",
+            reviewedBindings: [reviewedBinding],
+            coverage: completeCoverage
+        )
+        do {
+            _ = try ReviewedWaterBodyPromotion().promote(unapproved)
+            Check.expect(false, "unapproved candidate was promoted")
+        } catch {
+            Check.equal(error as? ReviewedWaterBodyPromotionError, .candidateNotApproved)
+        }
+
+        let incompleteCoverage = Array(completeCoverage.dropLast())
+        do {
+            _ = try ReviewedWaterBodyPromotion().promote(ReviewedWaterBodyPromotionRequest(
+                candidate: acceptedTahoe,
+                decision: decision,
+                approval: approval,
+                id: "unsafe-incomplete-coverage",
+                region: "Unknown",
+                reviewedBindings: [reviewedBinding],
+                coverage: incompleteCoverage
+            ))
+            Check.expect(false, "candidate with incomplete coverage declaration was promoted")
+        } catch {
+            Check.equal(error as? ReviewedWaterBodyPromotionError, .incompleteCoverageDeclaration)
+        }
+
+        let unsupportedWaterLevel = completeCoverage.map { declaration in
+            declaration.capability == .waterLevel
+                ? HydroCapabilityCoverageDeclaration(
+                    capability: .waterLevel,
+                    availability: .supported,
+                    sourceIDs: ["unreviewed-source"],
+                    note: "Claims water level without matching reviewed binding."
+                )
+                : declaration
+        }
+        do {
+            _ = try ReviewedWaterBodyPromotion().promote(ReviewedWaterBodyPromotionRequest(
+                candidate: acceptedTahoe,
+                decision: decision,
+                approval: approval,
+                id: "unsafe-unbacked-coverage",
+                region: "Unknown",
+                reviewedBindings: [reviewedBinding],
+                coverage: unsupportedWaterLevel
+            ))
+            Check.expect(false, "candidate with unbacked supported coverage was promoted")
+        } catch {
+            Check.equal(
+                error as? ReviewedWaterBodyPromotionError,
+                .supportedCoverageMissingReviewedBinding(.waterLevel)
+            )
+        }
+    }
+
+    Check.test("reviewed Place intake emits a deterministic artifact and fails closed on verification gaps") {
+        let decision = WaterBodyResolutionEvaluator().evaluate(acceptedTahoe)
+        let reviewedBinding = ReviewedSourceBindingDeclaration(
+            namespace: tahoeSource.namespace,
+            sourceID: tahoeSource.sourceID,
+            capabilities: tahoeSource.capabilities
+        )
+        let coverage = HydroCapability.allCases.map { capability in
+            HydroCapabilityCoverageDeclaration(
+                capability: capability,
+                availability: capability == .waterLevel ? .supported : .unavailable,
+                sourceIDs: capability == .waterLevel ? [tahoeSource.sourceID] : [],
+                note: "reviewed coverage"
+            )
+        }
+        let promotion = ReviewedWaterBodyPromotionRequest(
+            candidate: acceptedTahoe,
+            decision: decision,
+            approval: ReviewedResolutionApproval(
+                reviewerID: "rw4i-reviewer",
+                reviewedAt: Date(timeIntervalSince1970: 200),
+                approved: true,
+                notes: ["verified"]
+            ),
+            id: "rw4i-tahoe",
+            region: "California / Nevada, USA",
+            reviewedBindings: [reviewedBinding],
+            coverage: coverage
+        )
+        let evidence = ProductVerificationEvidenceKind.allCases.reversed().map {
+            ProductVerificationEvidence(kind: $0, verified: true, source: "fixture", note: $0.rawValue)
+        }
+        let artifact = try! ReviewedPlaceIntake().build(
+            ReviewedPlaceIntakeRequest(promotion: promotion, verificationEvidence: evidence)
+        )
+        Check.equal(artifact.place.id, "rw4i-tahoe")
+        Check.equal(artifact.reviewerID, "rw4i-reviewer")
+        Check.equal(artifact.verificationEvidence.map(\.kind), ProductVerificationEvidenceKind.allCases.sorted { $0.rawValue < $1.rawValue })
+
+        do {
+            _ = try ReviewedPlaceIntake().build(
+                ReviewedPlaceIntakeRequest(promotion: promotion, verificationEvidence: Array(evidence.dropLast()))
+            )
+            Check.expect(false, "incomplete product evidence was accepted")
+        } catch {
+            Check.equal(error as? ReviewedPlaceIntakeError, .incompleteVerificationEvidence)
+        }
+
+        let failedEvidence = evidence.map { item in
+            item.kind == .productPresentation
+                ? ProductVerificationEvidence(kind: item.kind, verified: false, source: item.source, note: item.note)
+                : item
+        }
+        do {
+            _ = try ReviewedPlaceIntake().build(
+                ReviewedPlaceIntakeRequest(promotion: promotion, verificationEvidence: failedEvidence)
+            )
+            Check.expect(false, "failed product evidence was accepted")
+        } catch {
+            Check.equal(error as? ReviewedPlaceIntakeError, .failedVerification(.productPresentation))
         }
     }
 

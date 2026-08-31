@@ -7,6 +7,12 @@ not to justify a decision already taken.
 that as a bonus.** The engineering is the valuable output; the revenue case is
 weak and the reasons are structural rather than fixable by pricing.
 
+The canonical product shape is hybrid, not confused: **Experiences** are authored
+expressive water states, and **Places** are evidence-grounded representations of
+real waters. This is product architecture, not a new pricing split. Monetization
+questions should not weaken the representative-water doctrine or imply arbitrary
+geographic coverage.
+
 ## The mechanics
 
 | Item | Figure |
