@@ -194,11 +194,6 @@ Metal's 31-buffer limit.
 | [ROADMAP.md](docs/ROADMAP.md) | The path from here to the App Store |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Setup, conventions, review expectations |
 
-## Licence
-
-MIT. See [LICENSE](LICENSE).
-
-
 ## License
 
 Copyright © 2026 Zero State LLC. All Rights Reserved. Licensed under the Zero State Proprietary License v1.0. See [`LICENSE`](LICENSE).
