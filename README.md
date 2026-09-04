@@ -167,6 +167,8 @@ Metal's 31-buffer limit.
 
 | Document | What it covers |
 |---|---|
+| [AGENTS.md](AGENTS.md) | Agent contract (intent, invariants, escalation). Claude: [CLAUDE.md](CLAUDE.md) |
+| [intent/](intent/) | Stage-0 proto-spec blanks. Do not invent product work here |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | How the water is rendered and driven |
 | [MODES.md](docs/MODES.md) | The fifteen modes, and how to add one |
 | [DECISIONS.md](docs/DECISIONS.md) | The load-bearing calls, including the rewrite |

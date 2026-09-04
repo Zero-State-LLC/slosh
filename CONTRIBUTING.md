@@ -1,5 +1,7 @@
 # Contributing
 
+Agents: read [AGENTS.md](AGENTS.md) first. Org context is `Zero-State-LLC/agent-context`, not this file.
+
 ## Setup
 
 Requires Xcode with the watchOS platform installed:
