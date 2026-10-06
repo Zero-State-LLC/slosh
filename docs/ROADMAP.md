@@ -1,3 +1,7 @@
+## Current next milestone — Phase 0 physical Apple Watch validation
+
+Phase 0 remains `OPEN / NOT_RUN` and blocks later product phases. The next milestone is a real-watch validation pass for tilt direction and crown orientation, worst-mode frame rate and battery, and haptics, using the deterministic device runbook. Simulator results cannot close these gates; no calendar ship date is claimed.
+
 # Roadmap
 
 From "runs on a simulator" to "on the App Store". Phases are ordered by risk:
